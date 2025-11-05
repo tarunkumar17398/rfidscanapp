@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
 import { ArrowLeft } from 'lucide-react';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 interface Scan {
   id: number;
@@ -44,6 +45,7 @@ const LiveScans = () => {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <h1 className="text-xl sm:text-3xl font-bold">Live Scans</h1>
+            <ConnectionStatus />
           </div>
           <div className="flex items-center gap-3 ml-0 sm:ml-auto w-full sm:w-auto justify-between sm:justify-end">
             <Badge variant={scanning ? "default" : "secondary"} className="text-xs sm:text-sm whitespace-nowrap">

@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText } from 'lucide-react';
+import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 interface CategoryStats {
   category: string;
@@ -112,7 +113,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between gap-2">
-          <h1 className="text-2xl sm:text-3xl font-bold">Inventory Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold">Inventory Dashboard</h1>
+            <ConnectionStatus />
+          </div>
           <Button variant="outline" onClick={handleLogout} size="sm" className="h-10 px-3">
             <LogOut className="h-4 w-4 sm:mr-2" />
             <span className="hidden sm:inline">Logout</span>

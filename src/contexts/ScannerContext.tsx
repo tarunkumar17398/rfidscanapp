@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { RFIDScanner } from '@/lib/rfidScanner';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { syncManager } from '@/lib/syncManager';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 interface ScanAttempt {
   tagId: string;
@@ -32,6 +34,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const { toast } = useToast();
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
@@ -41,6 +44,26 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       
       const scanTime = new Date().toLocaleString();
       
+      // If offline, save to local storage
+      if (!isOnline) {
+        await syncManager.addPendingScan(tagId);
+        
+        setScanAttempts(prev => [{
+          tagId,
+          time: scanTime,
+          success: true,
+          duplicate: false
+        }, ...prev]);
+        
+        toast({ 
+          title: '📴 Saved Offline', 
+          description: `Tag: ${tagId.substring(0, 8)}... (will sync later)`,
+          duration: 2000
+        });
+        return;
+      }
+      
+      // Online - try to send to server
       try {
         const response = await api.scan(tagId);
         console.log('Scan API response:', response);
@@ -70,18 +93,19 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error('Scan API error:', error);
         
-        // Still record the attempt even if API fails
+        // Save to offline storage as fallback
+        await syncManager.addPendingScan(tagId);
+        
         setScanAttempts(prev => [{
           tagId,
           time: scanTime,
-          success: false,
+          success: true,
           duplicate: false
         }, ...prev]);
         
         toast({ 
-          title: 'Scan Error', 
-          description: 'Failed to record scan',
-          variant: 'destructive',
+          title: '📴 Saved Offline', 
+          description: 'Server unreachable, saved locally',
           duration: 3000
         });
       }
@@ -91,7 +115,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       scanner.disconnect();
     };
-  }, [scanner, toast]);
+  }, [scanner, toast, isOnline]);
 
   const connectScanner = async () => {
     const connected = await scanner.connect();
