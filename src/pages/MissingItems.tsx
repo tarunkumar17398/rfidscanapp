@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
+import { decodeHtmlEntities } from '@/lib/utils';
 import { ArrowLeft } from 'lucide-react';
 
 interface MissingItem {
@@ -81,9 +82,9 @@ const MissingItems = () => {
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                           <div className="space-y-1 flex-1">
                             <p className="font-bold text-base sm:text-lg">{item.itemCode}</p>
-                            <p className="text-sm sm:text-base text-foreground break-words">{item.particulars}</p>
+                            <p className="text-sm sm:text-base text-foreground break-words">{decodeHtmlEntities(item.particulars)}</p>
                             <div className="flex flex-col sm:flex-row gap-1 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                              <span>Size: {item.size}</span>
+                              <span>Size: {decodeHtmlEntities(item.size)}</span>
                               <span>Weight: {item.weight}</span>
                             </div>
                           </div>
