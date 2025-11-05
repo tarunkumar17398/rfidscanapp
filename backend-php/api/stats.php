@@ -4,7 +4,7 @@ require_once '../config.php';
 $db = getDB();
 
 // Get most recent cycle (active or finished)
-$cycleStmt = $db->query("SELECT id, started_at FROM cycles ORDER BY started_at DESC LIMIT 1");
+$cycleStmt = $db->query("SELECT id, status, started_at, finished_at FROM cycles ORDER BY started_at DESC LIMIT 1");
 $cycle = $cycleStmt->fetch(PDO::FETCH_ASSOC);
 
 $stats = [];
@@ -37,5 +37,19 @@ foreach ($categories as $category) {
     ];
 }
 
-echo json_encode(['stats' => $stats]);
+// Include cycle info in response
+$cycleInfo = null;
+if ($cycle) {
+    $cycleInfo = [
+        'id' => $cycle['id'],
+        'status' => $cycle['status'],
+        'started_at' => $cycle['started_at'],
+        'finished_at' => $cycle['finished_at']
+    ];
+}
+
+echo json_encode([
+    'stats' => $stats,
+    'cycle' => $cycleInfo
+]);
 ?>

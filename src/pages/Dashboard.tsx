@@ -14,8 +14,16 @@ interface CategoryStats {
   missing: number;
 }
 
+interface CycleInfo {
+  id: number;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+}
+
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
+  const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const { scanning, scannerStatus, connectScanner, toggleScan, clearScanAttempts } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -38,6 +46,7 @@ const Dashboard = () => {
     try {
       const data = await api.getStats();
       setStats(data.stats || []);
+      setCycleInfo(data.cycle || null);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
@@ -91,6 +100,14 @@ const Dashboard = () => {
   const totalItems = stats.reduce((sum, s) => sum + s.total, 0);
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-IN', { 
+      dateStyle: 'medium', 
+      timeStyle: 'short' 
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
@@ -101,6 +118,41 @@ const Dashboard = () => {
             <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
+
+        {/* Cycle Info Card */}
+        {cycleInfo && (
+          <Card className="bg-muted/50 border-2">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base">Current Cycle: #{cycleInfo.id}</h3>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      cycleInfo.status === 'active' 
+                        ? 'bg-secondary text-secondary-foreground' 
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {cycleInfo.status === 'active' ? '● Active' : '● Finished'}
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Started: {formatDate(cycleInfo.started_at)}
+                  </p>
+                  {cycleInfo.finished_at && (
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Finished: {formatDate(cycleInfo.finished_at)}
+                    </p>
+                  )}
+                </div>
+                {cycleInfo.status === 'finished' && (
+                  <div className="text-xs sm:text-sm text-amber-600 dark:text-amber-500 font-medium">
+                    📊 Viewing finished cycle data
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Card className="border-primary">
