@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  base: '/rfidscanapp/', // GitHub Pages base path
+  base: mode === 'production' ? '/rfidscanapp/' : '/', // GitHub Pages base path only in production
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {

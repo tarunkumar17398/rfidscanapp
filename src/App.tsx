@@ -20,7 +20,7 @@ const App = () => (
       <ScannerProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter basename="/rfidscanapp">
+        <BrowserRouter basename={import.meta.env.PROD ? "/rfidscanapp" : ""}>
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
