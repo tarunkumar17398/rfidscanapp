@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { RFIDScanner } from '@/lib/rfidScanner';
+import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut } from 'lucide-react';
 
 interface CategoryStats {
@@ -16,9 +16,7 @@ interface CategoryStats {
 
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
-  const [scanning, setScanning] = useState(false);
-  const [scannerStatus, setScannerStatus] = useState('Not connected');
-  const [scanner] = useState(() => new RFIDScanner());
+  const { scanning, scannerStatus, connectScanner, toggleScan } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -28,22 +26,11 @@ const Dashboard = () => {
       return;
     }
 
-    scanner.setOnStatusChange(setScannerStatus);
-    scanner.setOnTagScanned(async (tagId) => {
-      try {
-        await api.scan(tagId);
-        fetchStats();
-      } catch (error) {
-        console.error('Scan API error:', error);
-      }
-    });
-
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
 
     return () => {
       clearInterval(interval);
-      scanner.disconnect();
     };
   }, []);
 
@@ -76,22 +63,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleConnectScanner = async () => {
-    const connected = await scanner.connect();
-    if (connected) {
-      toast({ title: 'Scanner Connected', description: 'Ready to scan' });
-    }
-  };
-
-  const handleToggleScan = async () => {
-    if (scanning) {
-      await scanner.stopScan();
-      setScanning(false);
-    } else {
-      await scanner.startScan();
-      setScanning(true);
-    }
-  };
 
   const handleExport = async () => {
     try {
@@ -167,10 +138,10 @@ const Dashboard = () => {
               <span className={scanning ? 'text-secondary font-bold' : 'text-muted-foreground'}>{scannerStatus}</span>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Button onClick={handleConnectScanner} variant="outline">
+              <Button onClick={connectScanner} variant="outline">
                 Connect Scanner
               </Button>
-              <Button onClick={handleToggleScan} disabled={scannerStatus === 'Not connected'}>
+              <Button onClick={toggleScan} disabled={scannerStatus === 'Not connected'}>
                 {scanning ? <><Square className="mr-2 h-4 w-4" />Stop Scan</> : <><Play className="mr-2 h-4 w-4" />Start Scan</>}
               </Button>
               <Button onClick={handleStartCycle} variant="secondary">

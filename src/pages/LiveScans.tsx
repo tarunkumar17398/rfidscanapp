@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
+import { useScanner } from '@/contexts/ScannerContext';
 import { ArrowLeft } from 'lucide-react';
 
 interface Scan {
@@ -15,6 +17,7 @@ interface Scan {
 
 const LiveScans = () => {
   const [scans, setScans] = useState<Scan[]>([]);
+  const { scannerStatus, scanning } = useScanner();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,7 +43,10 @@ const LiveScans = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-3xl font-bold">Live Scans</h1>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            <Badge variant={scanning ? "default" : "secondary"} className="text-sm">
+              {scannerStatus}
+            </Badge>
             <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-2 w-2 bg-secondary rounded-full animate-pulse"></span>
               Auto-refreshing every 2 seconds
