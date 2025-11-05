@@ -199,7 +199,7 @@ const Dashboard = () => {
                 Connect Scanner
               </Button>
               <Button onClick={toggleScan} disabled={scannerStatus === 'Not connected'} className="h-12 sm:h-10 text-xs sm:text-sm">
-                {scanning ? <><Square className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Stop Scan</span></> : <><Play className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Start Scan</span></>}
+                {scanning ? <><Square className="h-4 w-4 mr-2" /><span>Stop Scan</span></> : <><Play className="h-4 w-4 mr-2" /><span>Start Scan</span></>}
               </Button>
               <Button onClick={handleStartCycle} variant="secondary" className="h-12 sm:h-10 text-xs sm:text-sm">
                 <Play className="h-4 w-4 sm:mr-2" />
