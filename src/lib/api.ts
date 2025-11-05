@@ -71,11 +71,24 @@ export const api = {
 
   // Scan endpoint (called by RFID scanner)
   scan: async (tagId: string) => {
-    const response = await fetch(`${API_BASE_URL}/scan.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tagId }),
-    });
-    return response.json();
+    console.log('=== API SCAN REQUEST ===');
+    console.log('Sending tagId to backend:', tagId);
+    console.log('URL:', `${API_BASE_URL}/scan.php`);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/scan.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagId }),
+      });
+      
+      const data = await response.json();
+      console.log('Backend response:', data);
+      console.log('======================');
+      return data;
+    } catch (error) {
+      console.error('API scan error:', error);
+      throw error;
+    }
   },
 };
