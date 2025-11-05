@@ -132,11 +132,16 @@ export class RFIDScanner {
 
   private handleRfidData(event: { target: { value: DataView } }) {
     const value = event.target.value;
+    
+    console.log('Raw RFID data received, byteLength:', value.byteLength);
+    
+    // EPC Data Extraction Logic
     const epcLength = value.getUint8(10);
     const epcStartIndex = 11;
     const epcEndIndex = epcStartIndex + epcLength;
 
     if (value.byteLength < epcEndIndex) {
+      console.error('Payload too short for reported EPC length.');
       return;
     }
 
@@ -146,6 +151,8 @@ export class RFIDScanner {
       hexArray.push(('0' + epcDataBytes[i].toString(16)).slice(-2).toUpperCase());
     }
     const rfidTag = hexArray.join('');
+    
+    console.log('RFID Tag extracted:', rfidTag);
 
     if (this.onTagScanned) {
       this.onTagScanned(rfidTag);
