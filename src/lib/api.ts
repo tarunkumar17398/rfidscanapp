@@ -69,6 +69,17 @@ export const api = {
     return blob;
   },
 
+  // Cycles
+  getCycles: async () => {
+    const response = await fetch(`${API_BASE_URL}/cycles.php`);
+    return response.json();
+  },
+
+  getReport: async (cycleId: number) => {
+    const response = await fetch(`${API_BASE_URL}/report.php?cycle_id=${cycleId}`);
+    return response.json();
+  },
+
   // Scan endpoint (called by RFID scanner)
   scan: async (tagId: string) => {
     console.log('=== API SCAN REQUEST ===');

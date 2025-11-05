@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import ImportInventory from "./pages/ImportInventory";
 import LiveScans from "./pages/LiveScans";
 import MissingItems from "./pages/MissingItems";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/import" element={<ImportInventory />} />
             <Route path="/live-scans" element={<LiveScans />} />
             <Route path="/missing" element={<MissingItems />} />
+            <Route path="/reports" element={<Reports />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

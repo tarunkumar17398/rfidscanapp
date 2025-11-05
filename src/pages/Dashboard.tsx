@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
-import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut } from 'lucide-react';
+import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText } from 'lucide-react';
 
 interface CategoryStats {
   category: string;
@@ -241,7 +241,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Button onClick={() => navigate('/import')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
             <Upload className="h-5 w-5 sm:mr-2" />
             <span className="ml-2 sm:ml-0">Import Inventory</span>
@@ -253,6 +253,10 @@ const Dashboard = () => {
           <Button onClick={() => navigate('/missing')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
             <AlertTriangle className="h-5 w-5 sm:mr-2" />
             <span className="ml-2 sm:ml-0">Missing Items</span>
+          </Button>
+          <Button onClick={() => navigate('/reports')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
+            <FileText className="h-5 w-5 sm:mr-2" />
+            <span className="ml-2 sm:ml-0">PDF Reports</span>
           </Button>
         </div>
 
