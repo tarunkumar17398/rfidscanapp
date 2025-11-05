@@ -40,32 +40,33 @@ const ImportInventory = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
+    <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="h-10">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-3xl font-bold">Import Inventory</h1>
+          <h1 className="text-xl sm:text-3xl font-bold">Import Inventory</h1>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {CATEGORIES.map((category) => (
             <Card key={category}>
-              <CardHeader>
-                <CardTitle>{category}</CardTitle>
-                <CardDescription>Upload CSV file to replace existing items</CardDescription>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">{category}</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Upload CSV file to replace existing items</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6 pt-0">
                 <div className="space-y-3">
                   <Input
                     type="file"
                     accept=".csv"
                     onChange={(e) => handleFileUpload(category, e.target.files?.[0])}
                     disabled={uploading === category}
+                    className="text-xs sm:text-sm h-10 sm:h-9"
                   />
                   {uploading === category && (
-                    <p className="text-sm text-muted-foreground flex items-center">
+                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center">
                       <Upload className="mr-2 h-4 w-4 animate-pulse" />
                       Uploading...
                     </p>
@@ -77,21 +78,21 @@ const ImportInventory = () => {
         </div>
 
         <Card className="bg-muted">
-          <CardHeader>
-            <CardTitle className="text-lg">CSV Format Requirements</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg">CSV Format Requirements</CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
+          <CardContent className="p-4 sm:p-6 pt-0">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               CSV files must contain the following columns:
             </p>
-            <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
+            <ul className="list-disc list-inside text-xs sm:text-sm text-muted-foreground mt-2 space-y-1">
               <li>ITEM CODE</li>
               <li>PARTICULARS</li>
               <li>SIZE</li>
               <li>Weight</li>
               <li>TAG ID (RFID)</li>
             </ul>
-            <p className="text-sm text-destructive mt-3">
+            <p className="text-xs sm:text-sm text-destructive mt-3 font-medium">
               ⚠️ Warning: Uploading a new file will replace all existing items for that category.
             </p>
           </CardContent>

@@ -51,12 +51,12 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">RFID Inventory Scanner</CardTitle>
-          <CardDescription>Enter your PIN to continue</CardDescription>
+        <CardHeader className="text-center p-6 sm:p-8">
+          <CardTitle className="text-2xl sm:text-3xl font-bold">RFID Inventory Scanner</CardTitle>
+          <CardDescription className="text-sm sm:text-base mt-2">Enter your PIN to continue</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+        <CardContent className="p-6 sm:p-8">
+          <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <Input
                 type="password"
@@ -65,10 +65,10 @@ const Login = () => {
                 placeholder="Enter 6-digit PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                className="text-center text-2xl tracking-widest"
+                className="text-center text-2xl sm:text-3xl tracking-widest h-14 sm:h-16"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full h-12 sm:h-14 text-base sm:text-lg" disabled={loading}>
               {loading ? 'Authenticating...' : 'Login'}
             </Button>
           </form>

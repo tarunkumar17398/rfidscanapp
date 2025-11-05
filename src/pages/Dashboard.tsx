@@ -92,65 +92,65 @@ const Dashboard = () => {
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Inventory Dashboard</h1>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
+    <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Inventory Dashboard</h1>
+          <Button variant="outline" onClick={handleLogout} size="sm" className="h-10 px-3">
+            <LogOut className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Card className="border-primary">
-            <CardHeader>
-              <CardTitle className="text-lg">Total Items</CardTitle>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-xs sm:text-lg">Total Items</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-primary">{totalItems}</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <p className="text-2xl sm:text-4xl font-bold text-primary">{totalItems}</p>
             </CardContent>
           </Card>
           <Card className="border-secondary">
-            <CardHeader>
-              <CardTitle className="text-lg">Scanned</CardTitle>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-secondary">{totalScanned}</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <p className="text-2xl sm:text-4xl font-bold text-secondary">{totalScanned}</p>
             </CardContent>
           </Card>
           <Card className="border-destructive">
-            <CardHeader>
-              <CardTitle className="text-lg">Missing</CardTitle>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-xs sm:text-lg">Missing</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-4xl font-bold text-destructive">{totalMissing}</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <p className="text-2xl sm:text-4xl font-bold text-destructive">{totalMissing}</p>
             </CardContent>
           </Card>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Scanner Control</CardTitle>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Scanner Control</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <span className="font-medium">Status:</span>
-              <span className={scanning ? 'text-secondary font-bold' : 'text-muted-foreground'}>{scannerStatus}</span>
+          <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
+              <span className="font-medium text-sm sm:text-base">Status:</span>
+              <span className={`text-sm sm:text-base ${scanning ? 'text-secondary font-bold' : 'text-muted-foreground'}`}>{scannerStatus}</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Button onClick={connectScanner} variant="outline">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <Button onClick={connectScanner} variant="outline" className="h-12 sm:h-10 text-xs sm:text-sm">
                 Connect Scanner
               </Button>
-              <Button onClick={toggleScan} disabled={scannerStatus === 'Not connected'}>
-                {scanning ? <><Square className="mr-2 h-4 w-4" />Stop Scan</> : <><Play className="mr-2 h-4 w-4" />Start Scan</>}
+              <Button onClick={toggleScan} disabled={scannerStatus === 'Not connected'} className="h-12 sm:h-10 text-xs sm:text-sm">
+                {scanning ? <><Square className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Stop Scan</span></> : <><Play className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">Start Scan</span></>}
               </Button>
-              <Button onClick={handleStartCycle} variant="secondary">
-                <Play className="mr-2 h-4 w-4" />
+              <Button onClick={handleStartCycle} variant="secondary" className="h-12 sm:h-10 text-xs sm:text-sm">
+                <Play className="h-4 w-4 sm:mr-2" />
                 New Cycle
               </Button>
-              <Button onClick={handleFinishCycle} variant="destructive">
-                <Square className="mr-2 h-4 w-4" />
+              <Button onClick={handleFinishCycle} variant="destructive" className="h-12 sm:h-10 text-xs sm:text-sm">
+                <Square className="h-4 w-4 sm:mr-2" />
                 Finish Cycle
               </Button>
             </div>
@@ -189,23 +189,23 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button onClick={() => navigate('/import')} variant="outline" className="h-20">
-            <Upload className="mr-2 h-5 w-5" />
-            Import Inventory
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <Button onClick={() => navigate('/import')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
+            <Upload className="h-5 w-5 sm:mr-2" />
+            <span className="ml-2 sm:ml-0">Import Inventory</span>
           </Button>
-          <Button onClick={() => navigate('/live-scans')} variant="outline" className="h-20">
-            <List className="mr-2 h-5 w-5" />
-            Live Scans
+          <Button onClick={() => navigate('/live-scans')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
+            <List className="h-5 w-5 sm:mr-2" />
+            <span className="ml-2 sm:ml-0">Live Scans</span>
           </Button>
-          <Button onClick={() => navigate('/missing')} variant="outline" className="h-20">
-            <AlertTriangle className="mr-2 h-5 w-5" />
-            Missing Items
+          <Button onClick={() => navigate('/missing')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
+            <AlertTriangle className="h-5 w-5 sm:mr-2" />
+            <span className="ml-2 sm:ml-0">Missing Items</span>
           </Button>
         </div>
 
-        <Button onClick={handleExport} className="w-full h-14" variant="secondary">
-          <FileDown className="mr-2 h-5 w-5" />
+        <Button onClick={handleExport} className="w-full h-14 sm:h-16 text-sm sm:text-base" variant="secondary">
+          <FileDown className="h-5 w-5 mr-2" />
           Export CSV Report
         </Button>
       </div>

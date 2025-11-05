@@ -36,58 +36,61 @@ const LiveScans = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/dashboard')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-3xl font-bold">Live Scans</h1>
-          <div className="ml-auto flex items-center gap-3">
-            <Badge variant={scanning ? "default" : "secondary"} className="text-sm">
+    <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => navigate('/dashboard')} className="h-10">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-xl sm:text-3xl font-bold">Live Scans</h1>
+          </div>
+          <div className="flex items-center gap-3 ml-0 sm:ml-auto w-full sm:w-auto justify-between sm:justify-end">
+            <Badge variant={scanning ? "default" : "secondary"} className="text-xs sm:text-sm whitespace-nowrap">
               {scannerStatus}
             </Badge>
-            <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
               <span className="h-2 w-2 bg-secondary rounded-full animate-pulse"></span>
-              Auto-refreshing every 2 seconds
+              <span className="hidden sm:inline">Auto-refreshing every 2 seconds</span>
+              <span className="sm:hidden">Auto-refresh</span>
             </span>
           </div>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>All Tag Reads ({scanAttempts.length})</CardTitle>
-            <p className="text-sm text-muted-foreground">Shows all scanned tags including duplicates</p>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">All Tag Reads ({scanAttempts.length})</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground">Shows all scanned tags including duplicates</p>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[500px]">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-semibold">Time</th>
-                    <th className="text-left p-3 font-semibold">Tag ID</th>
-                    <th className="text-left p-3 font-semibold">Status</th>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Time</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Tag ID</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scanAttempts.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center p-8 text-muted-foreground">
+                      <td colSpan={3} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
                         No scans yet. Start scanning to see live data.
                       </td>
                     </tr>
                   ) : (
                     scanAttempts.map((attempt, index) => (
                       <tr key={index} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="p-3 font-mono text-sm">{attempt.time}</td>
-                        <td className="p-3 font-mono text-sm">{attempt.tagId}</td>
-                        <td className="p-3">
+                        <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm">{attempt.time}</td>
+                        <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm break-all">{attempt.tagId}</td>
+                        <td className="p-2 sm:p-3">
                           {attempt.success ? (
-                            <Badge variant="default" className="text-xs">New</Badge>
+                            <Badge variant="default" className="text-[10px] sm:text-xs">New</Badge>
                           ) : attempt.duplicate ? (
-                            <Badge variant="secondary" className="text-xs">Duplicate</Badge>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs">Duplicate</Badge>
                           ) : (
-                            <Badge variant="destructive" className="text-xs">Error</Badge>
+                            <Badge variant="destructive" className="text-[10px] sm:text-xs">Error</Badge>
                           )}
                         </td>
                       </tr>
@@ -100,36 +103,36 @@ const LiveScans = () => {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Unique Scans - Current Cycle ({scans.length})</CardTitle>
-            <p className="text-sm text-muted-foreground">Only unique items saved to database</p>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Unique Scans - Current Cycle ({scans.length})</CardTitle>
+            <p className="text-xs sm:text-sm text-muted-foreground">Only unique items saved to database</p>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
+          <CardContent className="p-0 sm:p-6">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full min-w-[600px]">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-semibold">Time</th>
-                    <th className="text-left p-3 font-semibold">Tag ID</th>
-                    <th className="text-left p-3 font-semibold">Item Code</th>
-                    <th className="text-left p-3 font-semibold">Category</th>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Time</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Tag ID</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Item Code</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Category</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scans.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center p-8 text-muted-foreground">
+                      <td colSpan={4} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
                         No unique scans in current cycle yet.
                       </td>
                     </tr>
                   ) : (
                     scans.map((scan) => (
                       <tr key={scan.id} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="p-3 font-mono text-sm">{scan.time}</td>
-                        <td className="p-3 font-mono text-sm">{scan.tagId}</td>
-                        <td className="p-3 font-medium">{scan.itemCode}</td>
-                        <td className="p-3">
-                          <span className="inline-block px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                        <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm">{scan.time}</td>
+                        <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm break-all">{scan.tagId}</td>
+                        <td className="p-2 sm:p-3 font-medium text-xs sm:text-sm">{scan.itemCode}</td>
+                        <td className="p-2 sm:p-3">
+                          <span className="inline-block px-2 py-1 rounded-full text-[10px] sm:text-xs bg-primary/10 text-primary whitespace-nowrap">
                             {scan.category}
                           </span>
                         </td>
