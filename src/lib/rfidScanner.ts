@@ -63,40 +63,64 @@ export class RFIDScanner {
   async connect(): Promise<boolean> {
     if (!navigator.bluetooth) {
       this.updateStatus('Web Bluetooth not supported');
+      console.error('Web Bluetooth not supported');
       return false;
     }
 
     try {
       this.updateStatus('Searching for scanner...');
+      console.log('=== SCANNER CONNECTION START ===');
       
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: [SERVICE_UUID]
       });
 
+      console.log('Device selected:', device.name, device.id);
+
       device.addEventListener('gattserverdisconnected', () => {
+        console.log('GATT server disconnected');
         this.updateStatus('Disconnected');
         this.gattServer = null;
         this.writeCharacteristic = null;
       });
 
       this.updateStatus(`Connecting to ${device.name || 'scanner'}...`);
+      console.log('Connecting to GATT server...');
       this.gattServer = await device.gatt!.connect();
+      console.log('GATT server connected');
 
+      console.log('Getting primary service...');
       const service = await this.gattServer.getPrimaryService(SERVICE_UUID);
+      console.log('Service obtained');
+      
+      console.log('Getting write characteristic...');
       this.writeCharacteristic = await service.getCharacteristic(WRITE_UUID);
+      console.log('Write characteristic obtained');
+      
+      console.log('Getting notify characteristic...');
       const notifyCharacteristic = await service.getCharacteristic(NOTIFY_UUID);
+      console.log('Notify characteristic obtained');
 
+      console.log('Setting up notification listener...');
       notifyCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
+        console.log('🔔 NOTIFICATION RECEIVED - Raw event:', event);
         this.handleRfidData(event as any);
       });
+      
+      console.log('Starting notifications...');
       await notifyCharacteristic.startNotifications();
+      console.log('Notifications started successfully');
 
+      console.log('Sending scan mode command...');
       await this.writeCharacteristic.writeValue(SET_SCAN_MODE_COMMAND as any);
+      console.log('Scan mode set');
 
       this.updateStatus('Connected');
+      console.log('=== SCANNER CONNECTED SUCCESSFULLY ===');
       return true;
     } catch (error: any) {
+      console.error('Connection error:', error);
       this.updateStatus(`Connection failed: ${error.message}`);
       return false;
     }
@@ -104,28 +128,36 @@ export class RFIDScanner {
 
   async startScan(): Promise<void> {
     if (!this.writeCharacteristic) {
+      console.error('Cannot start scan - not connected');
       this.updateStatus('Not connected');
       return;
     }
 
     try {
+      console.log('📡 Sending START SCAN command...');
       await this.writeCharacteristic.writeValue(START_SCAN_COMMAND as any);
+      console.log('START SCAN command sent successfully');
       this.updateStatus('Scanning...');
     } catch (error: any) {
+      console.error('Start scan failed:', error);
       this.updateStatus(`Start scan failed: ${error.message}`);
     }
   }
 
   async stopScan(): Promise<void> {
     if (!this.writeCharacteristic) {
+      console.error('Cannot stop scan - not connected');
       this.updateStatus('Not connected');
       return;
     }
 
     try {
+      console.log('⏹️ Sending STOP SCAN command...');
       await this.writeCharacteristic.writeValue(STOP_SCAN_COMMAND as any);
+      console.log('STOP SCAN command sent successfully');
       this.updateStatus('Scan stopped');
     } catch (error: any) {
+      console.error('Stop scan failed:', error);
       this.updateStatus(`Stop scan failed: ${error.message}`);
     }
   }
