@@ -17,7 +17,7 @@ interface Scan {
 
 const LiveScans = () => {
   const [scans, setScans] = useState<Scan[]>([]);
-  const { scannerStatus, scanning } = useScanner();
+  const { scannerStatus, scanning, scanAttempts } = useScanner();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,7 +56,53 @@ const LiveScans = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Scans ({scans.length})</CardTitle>
+            <CardTitle>All Tag Reads ({scanAttempts.length})</CardTitle>
+            <p className="text-sm text-muted-foreground">Shows all scanned tags including duplicates</p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-semibold">Time</th>
+                    <th className="text-left p-3 font-semibold">Tag ID</th>
+                    <th className="text-left p-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scanAttempts.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="text-center p-8 text-muted-foreground">
+                        No scans yet. Start scanning to see live data.
+                      </td>
+                    </tr>
+                  ) : (
+                    scanAttempts.map((attempt, index) => (
+                      <tr key={index} className="border-b hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-mono text-sm">{attempt.time}</td>
+                        <td className="p-3 font-mono text-sm">{attempt.tagId}</td>
+                        <td className="p-3">
+                          {attempt.success ? (
+                            <Badge variant="default" className="text-xs">New</Badge>
+                          ) : attempt.duplicate ? (
+                            <Badge variant="secondary" className="text-xs">Duplicate</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="text-xs">Error</Badge>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Unique Scans - Current Cycle ({scans.length})</CardTitle>
+            <p className="text-sm text-muted-foreground">Only unique items saved to database</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -73,7 +119,7 @@ const LiveScans = () => {
                   {scans.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="text-center p-8 text-muted-foreground">
-                        No scans yet. Start scanning to see live data.
+                        No unique scans in current cycle yet.
                       </td>
                     </tr>
                   ) : (

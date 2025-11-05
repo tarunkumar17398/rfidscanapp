@@ -16,7 +16,7 @@ interface CategoryStats {
 
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
-  const { scanning, scannerStatus, connectScanner, toggleScan } = useScanner();
+  const { scanning, scannerStatus, connectScanner, toggleScan, clearScanAttempts } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -46,6 +46,7 @@ const Dashboard = () => {
   const handleStartCycle = async () => {
     try {
       await api.startCycle();
+      clearScanAttempts(); // Clear local scan history when starting new cycle
       toast({ title: 'Success', description: 'New cycle started' });
       fetchStats();
     } catch (error) {

@@ -4,8 +4,8 @@ require_once '../config.php';
 $db = getDB();
 
 try {
-    // Get current cycle
-    $cycleStmt = $db->query("SELECT id, started_at FROM cycles WHERE status = 'active' ORDER BY started_at DESC LIMIT 1");
+    // Get most recent cycle (active or finished)
+    $cycleStmt = $db->query("SELECT id, started_at FROM cycles ORDER BY started_at DESC LIMIT 1");
     $cycle = $cycleStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$cycle) {

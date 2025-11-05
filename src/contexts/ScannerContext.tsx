@@ -3,11 +3,20 @@ import { RFIDScanner } from '@/lib/rfidScanner';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
+interface ScanAttempt {
+  tagId: string;
+  time: string;
+  success: boolean;
+  duplicate: boolean;
+}
+
 interface ScannerContextType {
   scanner: RFIDScanner;
   scanning: boolean;
   scannerStatus: string;
   lastScannedTag: string | null;
+  scanAttempts: ScanAttempt[];
+  clearScanAttempts: () => void;
   connectScanner: () => Promise<boolean>;
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
@@ -21,6 +30,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scanning, setScanning] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('Not connected');
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
+  const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -29,9 +39,19 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       setLastScannedTag(tagId);
       console.log('Tag scanned:', tagId);
       
+      const scanTime = new Date().toLocaleString();
+      
       try {
         const response = await api.scan(tagId);
         console.log('Scan API response:', response);
+        
+        // Record ALL scan attempts locally
+        setScanAttempts(prev => [{
+          tagId,
+          time: scanTime,
+          success: response.success || false,
+          duplicate: response.duplicate || false
+        }, ...prev]);
         
         if (response.success) {
           toast({ 
@@ -49,6 +69,15 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error('Scan API error:', error);
+        
+        // Still record the attempt even if API fails
+        setScanAttempts(prev => [{
+          tagId,
+          time: scanTime,
+          success: false,
+          duplicate: false
+        }, ...prev]);
+        
         toast({ 
           title: 'Scan Error', 
           description: 'Failed to record scan',
@@ -90,6 +119,10 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const clearScanAttempts = () => {
+    setScanAttempts([]);
+  };
+
   return (
     <ScannerContext.Provider
       value={{
@@ -97,6 +130,8 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         scanning,
         scannerStatus,
         lastScannedTag,
+        scanAttempts,
+        clearScanAttempts,
         connectScanner,
         startScan,
         stopScan,
