@@ -8,7 +8,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 interface Cycle {
-  id: number;
+  id: string; // Changed from number to string (UUID)
   status: string;
   started_at: string;
   finished_at: string | null;
@@ -65,7 +65,7 @@ const Reports = () => {
     }
   };
 
-  const generatePDF = async (cycleId: number) => {
+  const generatePDF = async (cycleId: string) => {
     try {
       toast({
         title: 'Generating PDF...',

@@ -1,102 +1,359 @@
-// API configuration for PHP backend
-const API_BASE_URL = 'https://ckarts.in/rfidscan/api';
+// API layer using Lovable Cloud backend
+import { supabase } from '@/integrations/supabase/client';
 
 export const api = {
-  // Auth
+  // Auth - Simple PIN verification (will be replaced with proper auth later)
   login: async (pin: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin }),
-    });
-    return response.json();
+    // For now, accept the PIN (we'll add proper auth in next step)
+    if (pin === '612302') {
+      return { success: true };
+    }
+    return { success: false, message: 'Invalid PIN' };
   },
 
   // Dashboard stats
   getStats: async () => {
-    const response = await fetch(`${API_BASE_URL}/stats.php`);
-    return response.json();
+    try {
+      // Get most recent cycle
+      const { data: cycles, error: cycleError } = await supabase
+        .from('cycles')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (cycleError) throw cycleError;
+
+      const cycle = cycles?.[0] || null;
+      const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
+      const stats = [];
+
+      for (const category of categories) {
+        // Get total items in category
+        const { count: total, error: totalError } = await supabase
+          .from('inventory')
+          .select('*', { count: 'exact', head: true })
+          .eq('category', category);
+
+        if (totalError) throw totalError;
+
+        // Get scanned items in current cycle
+        let scanned = 0;
+        if (cycle) {
+          // First get all tag_ids for this category
+          const { data: inventoryItems, error: invError } = await supabase
+            .from('inventory')
+            .select('tag_id')
+            .eq('category', category);
+
+          if (invError) throw invError;
+
+          const categoryTagIds = inventoryItems?.map(i => i.tag_id) || [];
+
+          // Then get scans for those tag_ids
+          const { data: scannedItems, error: scannedError } = await supabase
+            .from('scans')
+            .select('tag_id')
+            .gte('scanned_at', cycle.started_at)
+            .in('tag_id', categoryTagIds);
+
+          if (scannedError) throw scannedError;
+          
+          // Count unique tag_ids
+          const uniqueTags = new Set(scannedItems?.map(s => s.tag_id) || []);
+          scanned = uniqueTags.size;
+        }
+
+        stats.push({
+          category,
+          total: total || 0,
+          scanned,
+          missing: (total || 0) - scanned
+        });
+      }
+
+      return {
+        stats,
+        cycle: cycle ? {
+          id: cycle.id,
+          status: cycle.status,
+          started_at: cycle.started_at,
+          finished_at: cycle.finished_at
+        } : null
+      };
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      throw error;
+    }
   },
 
   // Import inventory
   importInventory: async (category: string, file: File) => {
-    const formData = new FormData();
-    formData.append('category', category);
-    formData.append('file', file);
-    
-    const response = await fetch(`${API_BASE_URL}/import.php`, {
-      method: 'POST',
-      body: formData,
-    });
-    return response.json();
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      // Skip header row
+      const dataLines = lines.slice(1);
+      
+      // Delete existing items in this category
+      await supabase.from('inventory').delete().eq('category', category);
+
+      // Parse and insert new items
+      const items = dataLines.map(line => {
+        const [item_code, particulars, size, weight, tag_id] = line.split(',').map(s => s.trim());
+        return { item_code, particulars, size, weight, tag_id, category };
+      });
+
+      const { error } = await supabase.from('inventory').insert(items);
+      
+      if (error) throw error;
+
+      return { success: true, imported: items.length, message: `Successfully imported ${items.length} items` };
+    } catch (error) {
+      console.error('Error importing inventory:', error);
+      throw error;
+    }
   },
 
   // Cycle management
   startCycle: async () => {
-    const response = await fetch(`${API_BASE_URL}/cycle.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'start' }),
-    });
-    return response.json();
+    try {
+      // Close any active cycles
+      await supabase
+        .from('cycles')
+        .update({ status: 'finished', finished_at: new Date().toISOString() })
+        .eq('status', 'active');
+
+      // Start new cycle
+      const { error } = await supabase
+        .from('cycles')
+        .insert({ status: 'active', started_at: new Date().toISOString() });
+
+      if (error) throw error;
+
+      return { success: true, message: 'New cycle started' };
+    } catch (error) {
+      console.error('Error starting cycle:', error);
+      throw error;
+    }
   },
 
   finishCycle: async () => {
-    const response = await fetch(`${API_BASE_URL}/cycle.php`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'finish' }),
-    });
-    return response.json();
+    try {
+      const { error } = await supabase
+        .from('cycles')
+        .update({ status: 'finished', finished_at: new Date().toISOString() })
+        .eq('status', 'active');
+
+      if (error) throw error;
+
+      return { success: true, message: 'Cycle finished' };
+    } catch (error) {
+      console.error('Error finishing cycle:', error);
+      throw error;
+    }
   },
 
   // Live scans
   getLiveScans: async () => {
-    const response = await fetch(`${API_BASE_URL}/scans.php`);
-    return response.json();
+    try {
+      // Get most recent cycle
+      const { data: cycles } = await supabase
+        .from('cycles')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      const cycle = cycles?.[0];
+      
+      if (!cycle) {
+        return { scans: [] };
+      }
+
+      // Get scans from current cycle
+      const { data: scans, error } = await supabase
+        .from('scans')
+        .select('*')
+        .gte('scanned_at', cycle.started_at)
+        .order('scanned_at', { ascending: false })
+        .limit(1000);
+
+      if (error) throw error;
+
+      return {
+        scans: scans?.map(s => ({
+          id: s.id,
+          time: s.scanned_at,
+          tagId: s.tag_id,
+          itemCode: s.item_code,
+          category: s.category
+        })) || []
+      };
+    } catch (error) {
+      console.error('Error fetching live scans:', error);
+      throw error;
+    }
   },
 
   // Missing items
   getMissingItems: async () => {
-    const response = await fetch(`${API_BASE_URL}/missing.php`);
-    return response.json();
+    try {
+      // Get current active cycle
+      const { data: cycles } = await supabase
+        .from('cycles')
+        .select('*')
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      const cycle = cycles?.[0];
+      const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
+      const missing = [];
+
+      for (const category of categories) {
+        // Get all items in category
+        const { data: allItems, error: itemsError } = await supabase
+          .from('inventory')
+          .select('*')
+          .eq('category', category);
+
+        if (itemsError) throw itemsError;
+
+        if (!allItems || allItems.length === 0) continue;
+
+        // Get scanned tag_ids
+        let scannedTagIds: string[] = [];
+        if (cycle) {
+          const { data: scans, error: scansError } = await supabase
+            .from('scans')
+            .select('tag_id')
+            .gte('scanned_at', cycle.started_at);
+
+          if (scansError) throw scansError;
+          scannedTagIds = scans?.map(s => s.tag_id) || [];
+        }
+
+        // Find missing items
+        const missingItems = allItems.filter(item => !scannedTagIds.includes(item.tag_id));
+
+        if (missingItems.length > 0) {
+          missing.push({
+            category,
+            count: missingItems.length,
+            items: missingItems.map(item => ({
+              itemCode: item.item_code,
+              particulars: item.particulars,
+              size: item.size,
+              weight: item.weight,
+              tagId: item.tag_id
+            }))
+          });
+        }
+      }
+
+      return { missing };
+    } catch (error) {
+      console.error('Error fetching missing items:', error);
+      throw error;
+    }
   },
 
-  // Export report
+  // Export report - Will be implemented as edge function
   exportReport: async () => {
-    const response = await fetch(`${API_BASE_URL}/export.php`);
-    const blob = await response.blob();
-    return blob;
+    // TODO: Implement with edge function
+    throw new Error('Export not yet implemented with Cloud backend');
   },
 
   // Cycles
   getCycles: async () => {
-    const response = await fetch(`${API_BASE_URL}/cycles.php`);
-    return response.json();
+    try {
+      const { data: cycles, error } = await supabase
+        .from('cycles')
+        .select('*')
+        .order('started_at', { ascending: false });
+
+      if (error) throw error;
+
+      return { cycles: cycles || [] };
+    } catch (error) {
+      console.error('Error fetching cycles:', error);
+      throw error;
+    }
   },
 
-  getReport: async (cycleId: number) => {
-    const response = await fetch(`${API_BASE_URL}/report.php?cycle_id=${cycleId}`);
-    return response.json();
+  getReport: async (cycleId: string) => {
+    // TODO: Implement report generation
+    throw new Error('Report not yet implemented with Cloud backend');
   },
 
   // Scan endpoint (called by RFID scanner)
   scan: async (tagId: string) => {
     console.log('=== API SCAN REQUEST ===');
     console.log('Sending tagId to backend:', tagId);
-    console.log('URL:', `${API_BASE_URL}/scan.php`);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/scan.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagId }),
-      });
-      
-      const data = await response.json();
-      console.log('Backend response:', data);
+      // Get current active cycle
+      const { data: cycles } = await supabase
+        .from('cycles')
+        .select('*')
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      const cycle = cycles?.[0];
+
+      if (!cycle) {
+        return { success: false, message: 'No active cycle' };
+      }
+
+      // Check if tag exists in inventory
+      const { data: inventoryItem, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('tag_id', tagId)
+        .single();
+
+      if (inventoryError || !inventoryItem) {
+        return { success: false, message: 'Tag not found in inventory' };
+      }
+
+      // Check if already scanned in this cycle
+      const { data: existingScan } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('tag_id', tagId)
+        .gte('scanned_at', cycle.started_at)
+        .single();
+
+      if (existingScan) {
+        return { success: false, message: 'Already scanned', duplicate: true };
+      }
+
+      // Insert new scan
+      const { error: scanError } = await supabase
+        .from('scans')
+        .insert({
+          tag_id: tagId,
+          item_code: inventoryItem.item_code,
+          category: inventoryItem.category,
+          cycle_id: cycle.id,
+          scanned_at: new Date().toISOString()
+        });
+
+      if (scanError) throw scanError;
+
+      console.log('Scan recorded successfully');
       console.log('======================');
-      return data;
+
+      return {
+        success: true,
+        message: 'Scan recorded',
+        item: {
+          itemCode: inventoryItem.item_code,
+          category: inventoryItem.category,
+          particulars: inventoryItem.particulars
+        }
+      };
     } catch (error) {
       console.error('API scan error:', error);
       throw error;

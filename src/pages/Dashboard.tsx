@@ -16,7 +16,7 @@ interface CategoryStats {
 }
 
 interface CycleInfo {
-  id: number;
+  id: string; // Changed from number to string (UUID)
   status: string;
   started_at: string;
   finished_at: string | null;

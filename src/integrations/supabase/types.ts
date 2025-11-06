@@ -14,7 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cycles: {
+        Row: {
+          created_at: string | null
+          finished_at: string | null
+          id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      inventory: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          item_code: string
+          particulars: string | null
+          size: string | null
+          tag_id: string
+          weight: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          item_code: string
+          particulars?: string | null
+          size?: string | null
+          tag_id: string
+          weight?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          item_code?: string
+          particulars?: string | null
+          size?: string | null
+          tag_id?: string
+          weight?: string | null
+        }
+        Relationships: []
+      }
+      scans: {
+        Row: {
+          category: string | null
+          cycle_id: string | null
+          id: string
+          item_code: string | null
+          scanned_at: string
+          tag_id: string
+        }
+        Insert: {
+          category?: string | null
+          cycle_id?: string | null
+          id?: string
+          item_code?: string | null
+          scanned_at?: string
+          tag_id: string
+        }
+        Update: {
+          category?: string | null
+          cycle_id?: string | null
+          id?: string
+          item_code?: string | null
+          scanned_at?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scans_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "cycles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 
 interface Scan {
-  id: number;
+  id: string; // Changed from number to string (UUID)
   time: string;
   tagId: string;
   itemCode: string;
