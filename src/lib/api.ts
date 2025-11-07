@@ -282,8 +282,76 @@ export const api = {
   },
 
   getReport: async (cycleId: string) => {
-    // TODO: Implement report generation
-    throw new Error('Report not yet implemented with Cloud backend');
+    try {
+      // Get cycle info
+      const { data: cycle, error: cycleError } = await supabase
+        .from('cycles')
+        .select('*')
+        .eq('id', cycleId)
+        .single();
+
+      if (cycleError) throw cycleError;
+
+      // Get all inventory items by category
+      const { data: inventory, error: invError } = await supabase
+        .from('inventory')
+        .select('*');
+
+      if (invError) throw invError;
+
+      // Get scans for this cycle
+      const { data: scans, error: scansError } = await supabase
+        .from('scans')
+        .select('*')
+        .eq('cycle_id', cycleId)
+        .order('scanned_at', { ascending: false });
+
+      if (scansError) throw scansError;
+
+      // Group by category to calculate summary
+      const categoryMap = new Map();
+      inventory?.forEach((item) => {
+        if (!categoryMap.has(item.category)) {
+          categoryMap.set(item.category, { total: 0, tagIds: [] });
+        }
+        const cat = categoryMap.get(item.category);
+        cat.total++;
+        cat.tagIds.push(item.tag_id);
+      });
+
+      const scannedTagIds = new Set(scans?.map(s => s.tag_id) || []);
+
+      const summary = Array.from(categoryMap.entries()).map(([category, data]) => {
+        const scanned = data.tagIds.filter((tagId: string) => scannedTagIds.has(tagId)).length;
+        return {
+          category,
+          total: data.total,
+          scanned,
+          missing: data.total - scanned
+        };
+      });
+
+      // Get missing items
+      const missingItems = inventory?.filter(item => !scannedTagIds.has(item.tag_id)) || [];
+
+      // Get scanned items with details
+      const scannedItems = scans?.map(scan => ({
+        scanned_at: scan.scanned_at,
+        tag_id: scan.tag_id,
+        item_code: scan.item_code || '',
+        category: scan.category || ''
+      })) || [];
+
+      return {
+        cycle,
+        summary,
+        missingItems,
+        scannedItems
+      };
+    } catch (error) {
+      console.error('Error fetching report:', error);
+      throw error;
+    }
   },
 
   // Scan endpoint (called by RFID scanner)

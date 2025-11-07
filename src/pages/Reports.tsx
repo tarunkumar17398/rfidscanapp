@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { api } from '@/lib/api';
 
 interface Cycle {
   id: string; // Changed from number to string (UUID)
@@ -50,8 +51,7 @@ const Reports = () => {
 
   const fetchCycles = async () => {
     try {
-      const response = await fetch('https://ckarts.in/rfidscan/api/cycles.php');
-      const data = await response.json();
+      const data = await api.getCycles();
       setCycles(data.cycles || []);
     } catch (error) {
       console.error('Failed to fetch cycles:', error);
@@ -72,8 +72,7 @@ const Reports = () => {
         description: 'Please wait',
       });
 
-      const response = await fetch(`https://ckarts.in/rfidscan/api/report.php?cycle_id=${cycleId}`);
-      const data: ReportData = await response.json();
+      const data: ReportData = await api.getReport(cycleId);
 
       const pdf = new jsPDF();
       const pageWidth = pdf.internal.pageSize.getWidth();
