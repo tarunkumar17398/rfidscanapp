@@ -118,19 +118,32 @@ export const api = {
   // Cycle management
   startCycle: async () => {
     try {
+      console.log('Starting new cycle...');
+      
       // Close any active cycles
-      await supabase
+      const { error: updateError } = await supabase
         .from('cycles')
         .update({ status: 'finished', finished_at: new Date().toISOString() })
         .eq('status', 'active');
 
+      if (updateError) {
+        console.error('Error closing active cycles:', updateError);
+        throw updateError;
+      }
+
       // Start new cycle
-      const { error } = await supabase
+      const { data, error: insertError } = await supabase
         .from('cycles')
-        .insert({ status: 'active', started_at: new Date().toISOString() });
+        .insert({ status: 'active', started_at: new Date().toISOString() })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (insertError) {
+        console.error('Error inserting new cycle:', insertError);
+        throw insertError;
+      }
 
+      console.log('New cycle created:', data);
       return { success: true, message: 'New cycle started' };
     } catch (error) {
       console.error('Error starting cycle:', error);
