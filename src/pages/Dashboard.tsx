@@ -8,6 +8,7 @@ import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CategoryStats {
   category: string;
@@ -39,8 +40,26 @@ const Dashboard = () => {
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
 
+    // Subscribe to real-time scan updates
+    const channel = supabase
+      .channel('scan-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'scans'
+        },
+        () => {
+          console.log('New scan detected, refreshing stats...');
+          fetchStats();
+        }
+      )
+      .subscribe();
+
     return () => {
       clearInterval(interval);
+      supabase.removeChannel(channel);
     };
   }, []);
 
