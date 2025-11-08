@@ -187,15 +187,27 @@ const Dashboard = () => {
         </div>
 
         {/* Latest Cycle Category Stats */}
-        {cycleInfo && stats.length > 0 && (
-          <Card>
-            <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg sm:text-xl">Latest Cycle Results</CardTitle>
+        <Card>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-lg sm:text-xl">Latest Cycle Results</CardTitle>
+            {cycleInfo && (
               <p className="text-sm text-muted-foreground mt-1">
                 Cycle #{cycleInfo.id.slice(0, 8)} • Started {formatDate(cycleInfo.started_at)}
               </p>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0">
+            )}
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0">
+            {!cycleInfo ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No cycle data available</p>
+                <p className="text-xs mt-2">Click "New Cycle" to start tracking inventory</p>
+              </div>
+            ) : stats.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No inventory data found</p>
+                <p className="text-xs mt-2">Import inventory first to see results</p>
+              </div>
+            ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -218,9 +230,9 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="p-4 sm:p-6">
