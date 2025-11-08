@@ -23,18 +23,9 @@ interface CycleInfo {
   finished_at: string | null;
 }
 
-interface Cycle {
-  id: string;
-  status: string;
-  started_at: string;
-  finished_at: string | null;
-  created_at?: string;
-}
-
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
-  const [recentCycles, setRecentCycles] = useState<Cycle[]>([]);
   const { scanning, scannerStatus, connectScanner, toggleScan, clearScanAttempts } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -58,10 +49,6 @@ const Dashboard = () => {
       const data = await api.getStats();
       setStats(data.stats || []);
       setCycleInfo(data.cycle || null);
-      
-      // Fetch recent cycles
-      const cyclesData = await api.getCycles();
-      setRecentCycles(cyclesData.cycles.slice(0, 5)); // Show last 5 cycles
     } catch (error) {
       console.error('Failed to fetch stats:', error);
     }
@@ -199,38 +186,33 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Cycles Table */}
-        {recentCycles.length > 0 && (
+        {/* Latest Cycle Category Stats */}
+        {cycleInfo && stats.length > 0 && (
           <Card>
             <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg sm:text-xl">Recent Cycle Results</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Latest Cycle Results</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Cycle #{cycleInfo.id.slice(0, 8)} • Started {formatDate(cycleInfo.started_at)}
+              </p>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Cycle ID</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Started</TableHead>
-                      <TableHead>Finished</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Scanned</TableHead>
+                      <TableHead className="text-right">Missing</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentCycles.map((cycle) => (
-                      <TableRow key={cycle.id}>
-                        <TableCell className="font-medium">#{cycle.id.slice(0, 8)}</TableCell>
-                        <TableCell>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            cycle.status === 'active' 
-                              ? 'bg-secondary text-secondary-foreground' 
-                              : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {cycle.status === 'active' ? '● Active' : '● Finished'}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm">{formatDate(cycle.started_at)}</TableCell>
-                        <TableCell className="text-sm">{formatDate(cycle.finished_at)}</TableCell>
+                    {stats.map((stat) => (
+                      <TableRow key={stat.category}>
+                        <TableCell className="font-medium">{stat.category}</TableCell>
+                        <TableCell className="text-right">{stat.total}</TableCell>
+                        <TableCell className="text-right text-secondary font-semibold">{stat.scanned}</TableCell>
+                        <TableCell className="text-right text-destructive font-semibold">{stat.missing}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
