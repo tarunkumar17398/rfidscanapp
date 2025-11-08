@@ -38,21 +38,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/ckarts\.in\/rfidscan\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              },
-              networkTimeoutSeconds: 10
-            }
-          }
-        ]
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
       }
     })
   ].filter(Boolean),
