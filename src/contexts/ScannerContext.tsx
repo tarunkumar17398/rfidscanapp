@@ -35,10 +35,33 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
+  
+  // Cooldown map to prevent duplicate scans (4 second cooldown)
+  const recentScansRef = useState<Map<string, number>>(() => new Map())[0];
+  const COOLDOWN_MS = 4000;
 
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
     scanner.setOnTagScanned(async (tagId) => {
+      // Check cooldown - ignore if scanned within last 4 seconds
+      const now = Date.now();
+      const lastScanTime = recentScansRef.get(tagId);
+      
+      if (lastScanTime && (now - lastScanTime) < COOLDOWN_MS) {
+        console.log(`Tag ${tagId} ignored - within cooldown period`);
+        return; // Ignore this scan completely
+      }
+      
+      // Update cooldown timestamp
+      recentScansRef.set(tagId, now);
+      
+      // Clean up old entries (older than 10 seconds)
+      for (const [key, time] of recentScansRef.entries()) {
+        if (now - time > 10000) {
+          recentScansRef.delete(key);
+        }
+      }
+      
       setLastScannedTag(tagId);
       console.log('Tag scanned:', tagId);
       
