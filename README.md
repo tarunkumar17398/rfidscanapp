@@ -1,5 +1,9 @@
 # Welcome to your Lovable project
 
+## 🔄 Connected to Lovable Cloud Backend
+
+This app uses Lovable Cloud (Supabase) for all data storage.
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/c2de12c3-a4c3-4deb-94ef-827a6678c1ad
