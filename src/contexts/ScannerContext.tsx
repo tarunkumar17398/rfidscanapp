@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { RFIDScanner } from '@/lib/rfidScanner';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,9 @@ interface ScannerContextType {
   scannerStatus: string;
   lastScannedTag: string | null;
   scanAttempts: ScanAttempt[];
+  totalScans: number;
+  scanRate: number;
+  pulseTrigger: number;
   clearScanAttempts: () => void;
   connectScanner: () => Promise<boolean>;
   startScan: () => Promise<void>;
@@ -33,12 +36,21 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scannerStatus, setScannerStatus] = useState('Not connected');
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
+  const [totalScans, setTotalScans] = useState(0);
+  const [scanRate, setScanRate] = useState(0);
+  const [pulseTrigger, setPulseTrigger] = useState(0);
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
   
   // Cooldown map to prevent duplicate scans (4 second cooldown)
   const recentScansRef = useState<Map<string, number>>(() => new Map())[0];
   const COOLDOWN_MS = 4000;
+  
+  // Batching for smooth UI updates
+  const scanBufferRef = useState<Array<{ tagId: string; time: string }>>(() => [])[0];
+  const lastBatchTimeRef = useRef(Date.now());
+  const scanCountInLastSecondRef = useRef<number[]>([]);
+  const lastMilestoneRef = useRef(0);
 
   // Periodic cleanup of old cooldown entries (runs every 5 seconds)
   useEffect(() => {
@@ -53,6 +65,96 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
     return () => clearInterval(cleanupInterval);
   }, [recentScansRef]);
+
+  // Batched UI updates every 500ms for smooth performance
+  useEffect(() => {
+    const batchInterval = setInterval(() => {
+      if (scanBufferRef.length === 0) return;
+
+      const now = Date.now();
+      const timeSinceLastBatch = now - lastBatchTimeRef.current;
+      
+      // Calculate scan rate (tags per second)
+      const scansInBatch = scanBufferRef.length;
+      scanCountInLastSecondRef.current.push(scansInBatch);
+      
+      // Keep only last 2 seconds of data for rate calculation
+      if (scanCountInLastSecondRef.current.length > 4) {
+        scanCountInLastSecondRef.current.shift();
+      }
+      
+      const avgRate = Math.round(
+        (scanCountInLastSecondRef.current.reduce((a, b) => a + b, 0) / 
+        scanCountInLastSecondRef.current.length) * 2 // Convert to per-second rate
+      );
+      
+      setScanRate(avgRate);
+
+      // Update total scan count
+      const newTotal = totalScans + scansInBatch;
+      setTotalScans(newTotal);
+
+      // Check for milestones (10, 50, 100, 500, 1000, etc.)
+      const milestones = [10, 50, 100, 500, 1000, 2000, 5000];
+      const reachedMilestone = milestones.find(
+        m => newTotal >= m && lastMilestoneRef.current < m
+      );
+      
+      if (reachedMilestone) {
+        lastMilestoneRef.current = reachedMilestone;
+        toast({
+          title: `🎯 Milestone: ${reachedMilestone} scans!`,
+          description: `Scan rate: ${avgRate} tags/sec`,
+          duration: 3000
+        });
+      }
+
+      // Trigger pulse feedback for batch
+      setPulseTrigger(prev => prev + 1);
+
+      // Add to scan attempts (limit to last 100 for performance)
+      setScanAttempts(prev => [
+        ...scanBufferRef.map(scan => ({
+          tagId: scan.tagId,
+          time: scan.time,
+          success: true,
+          duplicate: false
+        })),
+        ...prev
+      ].slice(0, 100));
+
+      // Process scans to server (background, non-blocking)
+      scanBufferRef.forEach(async ({ tagId }) => {
+        if (isOnline) {
+          try {
+            await api.scan(tagId);
+          } catch (error) {
+            await syncManager.addPendingScan(tagId);
+          }
+        } else {
+          await syncManager.addPendingScan(tagId);
+        }
+      });
+
+      // Clear buffer
+      scanBufferRef.length = 0;
+      lastBatchTimeRef.current = now;
+    }, 500);
+
+    return () => clearInterval(batchInterval);
+  }, [totalScans, isOnline, toast]);
+
+  // Reset scan rate when no scans for 2 seconds
+  useEffect(() => {
+    const rateResetInterval = setInterval(() => {
+      if (scanBufferRef.length === 0 && Date.now() - lastBatchTimeRef.current > 2000) {
+        setScanRate(0);
+        scanCountInLastSecondRef.current = [];
+      }
+    }, 2000);
+
+    return () => clearInterval(rateResetInterval);
+  }, []);
 
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
@@ -74,78 +176,15 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       
       const scanTime = new Date().toLocaleString();
       
-      // If offline, save to local storage
-      if (!isOnline) {
-        await syncManager.addPendingScan(tagId);
-        
-        setScanAttempts(prev => [{
-          tagId,
-          time: scanTime,
-          success: true,
-          duplicate: false
-        }, ...prev]);
-        
-        toast({ 
-          title: '📴 Saved Offline', 
-          description: `Tag: ${tagId.substring(0, 8)}... (will sync later)`,
-          duration: 2000
-        });
-        return;
-      }
-      
-      // Online - try to send to server
-      try {
-        const response = await api.scan(tagId);
-        console.log('Scan API response:', response);
-        
-        // Record ALL scan attempts locally
-        setScanAttempts(prev => [{
-          tagId,
-          time: scanTime,
-          success: response.success || false,
-          duplicate: response.duplicate || false
-        }, ...prev]);
-        
-        if (response.success) {
-          toast({ 
-            title: '✓ Scanned', 
-            description: `Tag: ${tagId.substring(0, 8)}...`,
-            duration: 2000
-          });
-        } else if (response.duplicate) {
-          toast({ 
-            title: 'Already Scanned', 
-            description: `Tag: ${tagId.substring(0, 8)}...`,
-            variant: 'default',
-            duration: 2000
-          });
-        }
-      } catch (error) {
-        console.error('Scan API error:', error);
-        
-        // Save to offline storage as fallback
-        await syncManager.addPendingScan(tagId);
-        
-        setScanAttempts(prev => [{
-          tagId,
-          time: scanTime,
-          success: true,
-          duplicate: false
-        }, ...prev]);
-        
-        toast({ 
-          title: '📴 Saved Offline', 
-          description: 'Server unreachable, saved locally',
-          duration: 3000
-        });
-      }
+      // Add to buffer for batched processing (optimistic UI)
+      scanBufferRef.push({ tagId, time: scanTime });
     });
 
     // Cleanup on app unmount only
     return () => {
       scanner.disconnect();
     };
-  }, [scanner, toast, isOnline]);
+  }, [scanner]);
 
   const connectScanner = async () => {
     const connected = await scanner.connect();
@@ -175,6 +214,10 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
   const clearScanAttempts = () => {
     setScanAttempts([]);
+    setTotalScans(0);
+    setScanRate(0);
+    lastMilestoneRef.current = 0;
+    scanCountInLastSecondRef.current = [];
   };
 
   return (
@@ -185,6 +228,9 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         scannerStatus,
         lastScannedTag,
         scanAttempts,
+        totalScans,
+        scanRate,
+        pulseTrigger,
         clearScanAttempts,
         connectScanner,
         startScan,
