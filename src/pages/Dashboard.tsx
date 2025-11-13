@@ -9,6 +9,8 @@ import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText }
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
+import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
+import { AnimatedTableCell } from '@/components/AnimatedTableCell';
 
 interface CategoryStats {
   category: string;
@@ -120,6 +122,11 @@ const Dashboard = () => {
   const totalScanned = stats.reduce((sum, s) => sum + s.scanned, 0);
   const totalItems = stats.reduce((sum, s) => sum + s.total, 0);
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
+  
+  // Animated counters for smooth transitions
+  const animatedTotalItems = useAnimatedCounter(totalItems);
+  const animatedTotalScanned = useAnimatedCounter(totalScanned);
+  const animatedTotalMissing = useAnimatedCounter(totalMissing);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -184,7 +191,7 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-lg">Total Items</CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <p className="text-2xl sm:text-4xl font-bold text-primary">{totalItems}</p>
+              <p className="text-2xl sm:text-4xl font-bold text-primary tabular-nums">{animatedTotalItems}</p>
             </CardContent>
           </Card>
           <Card className="border-secondary">
@@ -192,7 +199,7 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <p className="text-2xl sm:text-4xl font-bold text-secondary">{totalScanned}</p>
+              <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">{animatedTotalScanned}</p>
             </CardContent>
           </Card>
           <Card className="border-destructive">
@@ -200,7 +207,7 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-lg">Missing</CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <p className="text-2xl sm:text-4xl font-bold text-destructive">{totalMissing}</p>
+              <p className="text-2xl sm:text-4xl font-bold text-destructive tabular-nums">{animatedTotalMissing}</p>
             </CardContent>
           </Card>
         </div>
@@ -241,9 +248,9 @@ const Dashboard = () => {
                     {stats.map((stat) => (
                       <TableRow key={stat.category}>
                         <TableCell className="font-medium">{stat.category}</TableCell>
-                        <TableCell className="text-right">{stat.total}</TableCell>
-                        <TableCell className="text-right text-secondary font-semibold">{stat.scanned}</TableCell>
-                        <TableCell className="text-right text-destructive font-semibold">{stat.missing}</TableCell>
+                        <AnimatedTableCell value={stat.total} />
+                        <AnimatedTableCell value={stat.scanned} className="text-secondary font-semibold" />
+                        <AnimatedTableCell value={stat.missing} className="text-destructive font-semibold" />
                       </TableRow>
                     ))}
                   </TableBody>
