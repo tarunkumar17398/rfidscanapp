@@ -40,6 +40,20 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const recentScansRef = useState<Map<string, number>>(() => new Map())[0];
   const COOLDOWN_MS = 4000;
 
+  // Periodic cleanup of old cooldown entries (runs every 5 seconds)
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, time] of recentScansRef.entries()) {
+        if (now - time > 10000) {
+          recentScansRef.delete(key);
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(cleanupInterval);
+  }, [recentScansRef]);
+
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
     scanner.setOnTagScanned(async (tagId) => {
@@ -54,13 +68,6 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       
       // Update cooldown timestamp
       recentScansRef.set(tagId, now);
-      
-      // Clean up old entries (older than 10 seconds)
-      for (const [key, time] of recentScansRef.entries()) {
-        if (now - time > 10000) {
-          recentScansRef.delete(key);
-        }
-      }
       
       setLastScannedTag(tagId);
       console.log('Tag scanned:', tagId);
