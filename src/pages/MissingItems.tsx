@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { decodeHtmlEntities } from '@/lib/utils';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface MissingItem {
   itemCode: string;
@@ -22,18 +22,30 @@ interface MissingByCategory {
 
 const MissingItems = () => {
   const [missingData, setMissingData] = useState<MissingByCategory[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchMissingItems();
+    
+    // Set up auto-refresh every 2.5 seconds
+    const intervalId = setInterval(() => {
+      fetchMissingItems();
+    }, 2500);
+
+    // Cleanup interval on unmount
+    return () => clearInterval(intervalId);
   }, []);
 
   const fetchMissingItems = async () => {
     try {
+      setIsRefreshing(true);
       const data = await api.getMissingItems();
       setMissingData(data.missing || []);
     } catch (error) {
       console.error('Failed to fetch missing items:', error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -49,10 +61,13 @@ const MissingItems = () => {
             </Button>
             <h1 className="text-xl sm:text-3xl font-bold">Missing Items</h1>
           </div>
-          <div className="ml-0 sm:ml-auto">
+          <div className="ml-0 sm:ml-auto flex items-center gap-3">
             <span className="text-base sm:text-lg font-semibold text-destructive">
               Total Missing: {totalMissing}
             </span>
+            <RefreshCw 
+              className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`}
+            />
           </div>
         </div>
 
