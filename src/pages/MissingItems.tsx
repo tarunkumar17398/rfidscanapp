@@ -27,14 +27,6 @@ const MissingItems = () => {
 
   useEffect(() => {
     fetchMissingItems();
-    
-    // Set up auto-refresh every 2.5 seconds
-    const intervalId = setInterval(() => {
-      fetchMissingItems();
-    }, 2500);
-
-    // Cleanup interval on unmount
-    return () => clearInterval(intervalId);
   }, []);
 
   const fetchMissingItems = async () => {
@@ -65,9 +57,15 @@ const MissingItems = () => {
             <span className="text-base sm:text-lg font-semibold text-destructive">
               Total Missing: {totalMissing}
             </span>
-            <RefreshCw 
-              className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`}
-            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={fetchMissingItems}
+              disabled={isRefreshing}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
         </div>
 
