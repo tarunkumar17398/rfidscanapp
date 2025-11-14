@@ -46,11 +46,16 @@ const STOP_SCAN_COMMAND = finalizeCommand(STOP_SCAN_BASE);
 const SET_SCAN_MODE_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x8E, 0x09, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 const SET_SCAN_MODE_COMMAND = finalizeCommand(SET_SCAN_MODE_BASE);
 
+const GET_BATTERY_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x81, 0x00]);
+const GET_BATTERY_COMMAND = finalizeCommand(GET_BATTERY_BASE);
+
 export class RFIDScanner {
   private gattServer: BluetoothRemoteGATTServer | null = null;
   private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private onTagScanned: ((tagId: string) => void) | null = null;
   private onStatusChange: ((status: string) => void) | null = null;
+  private onBatteryUpdate: ((percentage: number) => void) | null = null;
+  private batteryCheckInterval: number | null = null;
 
   setOnTagScanned(callback: (tagId: string) => void) {
     this.onTagScanned = callback;
@@ -58,6 +63,10 @@ export class RFIDScanner {
 
   setOnStatusChange(callback: (status: string) => void) {
     this.onStatusChange = callback;
+  }
+
+  setOnBatteryUpdate(callback: (percentage: number) => void) {
+    this.onBatteryUpdate = callback;
   }
 
   async connect(): Promise<boolean> {
@@ -118,6 +127,10 @@ export class RFIDScanner {
 
       this.updateStatus('Connected');
       console.log('=== SCANNER CONNECTED SUCCESSFULLY ===');
+      
+      // Start battery monitoring (check every 30 seconds)
+      this.startBatteryMonitoring();
+      
       return true;
     } catch (error: any) {
       console.error('Connection error:', error);
@@ -162,10 +175,41 @@ export class RFIDScanner {
     }
   }
 
+  private async startBatteryMonitoring() {
+    // Get initial battery level
+    await this.checkBattery();
+    
+    // Check battery every 30 seconds
+    this.batteryCheckInterval = window.setInterval(async () => {
+      await this.checkBattery();
+    }, 30000);
+  }
+
+  private async checkBattery() {
+    if (!this.writeCharacteristic) return;
+    
+    try {
+      console.log('🔋 Requesting battery level...');
+      await this.writeCharacteristic.writeValue(GET_BATTERY_COMMAND as any);
+    } catch (error: any) {
+      console.error('Battery check failed:', error);
+    }
+  }
+
   private handleRfidData(event: { target: { value: DataView } }) {
     const value = event.target.value;
     
     console.log('Raw RFID data received, byteLength:', value.byteLength);
+    
+    // Check if this is a battery response (command 0x81)
+    if (value.byteLength >= 7 && value.getUint8(3) === 0x81) {
+      const batteryPercentage = value.getUint8(5);
+      console.log('🔋 Battery level:', batteryPercentage + '%');
+      if (this.onBatteryUpdate) {
+        this.onBatteryUpdate(batteryPercentage);
+      }
+      return;
+    }
     
     // EPC Data Extraction Logic
     const epcLength = value.getUint8(10);
@@ -198,6 +242,10 @@ export class RFIDScanner {
   }
 
   disconnect() {
+    if (this.batteryCheckInterval) {
+      clearInterval(this.batteryCheckInterval);
+      this.batteryCheckInterval = null;
+    }
     if (this.gattServer) {
       this.gattServer.disconnect();
     }

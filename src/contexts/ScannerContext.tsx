@@ -16,6 +16,7 @@ interface ScannerContextType {
   scanner: RFIDScanner;
   scanning: boolean;
   scannerStatus: string;
+  batteryPercentage: number | null;
   lastScannedTag: string | null;
   scanAttempts: ScanAttempt[];
   totalScans: number;
@@ -34,6 +35,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scanner] = useState(() => new RFIDScanner());
   const [scanning, setScanning] = useState(false);
   const [scannerStatus, setScannerStatus] = useState('Not connected');
+  const [batteryPercentage, setBatteryPercentage] = useState<number | null>(null);
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
@@ -169,6 +171,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
+    scanner.setOnBatteryUpdate(setBatteryPercentage);
     scanner.setOnTagScanned(async (tagId) => {
       // Check cooldown - ignore if scanned within last 4 seconds
       const now = Date.now();
@@ -237,6 +240,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         scanner,
         scanning,
         scannerStatus,
+        batteryPercentage,
         lastScannedTag,
         scanAttempts,
         totalScans,

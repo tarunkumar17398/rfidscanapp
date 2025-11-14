@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { ScannerStatus } from '@/components/ScannerStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
@@ -267,7 +268,7 @@ const Dashboard = () => {
           <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6">
             <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
               <span className="font-medium text-sm sm:text-base">Status:</span>
-              <span className={`text-sm sm:text-base ${scanning ? 'text-secondary font-bold' : 'text-muted-foreground'}`}>{scannerStatus}</span>
+              <ScannerStatus />
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Button onClick={connectScanner} variant="outline" className="h-12 sm:h-10 text-xs sm:text-sm">
