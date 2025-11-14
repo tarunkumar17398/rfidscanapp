@@ -367,6 +367,16 @@ export const api = {
     }
   },
 
+  // Batch scan multiple tags at once (optimized)
+  batchScan: async (tagIds: string[]) => {
+    const { data, error } = await supabase.functions.invoke('batch-scan', {
+      body: { tagIds }
+    });
+
+    if (error) throw error;
+    return data;
+  },
+
   // Scan endpoint (called by RFID scanner)
   scan: async (tagId: string) => {
     console.log('=== API SCAN REQUEST ===');

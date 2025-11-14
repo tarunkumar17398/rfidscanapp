@@ -123,18 +123,29 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         ...prev
       ].slice(0, 100));
 
-      // Process scans to server (background, non-blocking)
-      scanBufferRef.forEach(async ({ tagId }) => {
-        if (isOnline) {
-          try {
-            await api.scan(tagId);
-          } catch (error) {
-            await syncManager.addPendingScan(tagId);
+      // Process scans to server using batch API (background, non-blocking)
+      (async () => {
+        if (scanBufferRef.length > 0) {
+          const tagIds = scanBufferRef.map(scan => scan.tagId);
+          
+          if (isOnline) {
+            try {
+              await api.batchScan(tagIds);
+            } catch (error) {
+              console.error('Batch scan failed, falling back to offline storage:', error);
+              // Fallback to offline storage
+              for (const tagId of tagIds) {
+                await syncManager.addPendingScan(tagId);
+              }
+            }
+          } else {
+            // Offline: store all for later sync
+            for (const tagId of tagIds) {
+              await syncManager.addPendingScan(tagId);
+            }
           }
-        } else {
-          await syncManager.addPendingScan(tagId);
         }
-      });
+      })();
 
       // Clear buffer
       scanBufferRef.length = 0;
