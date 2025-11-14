@@ -28,7 +28,6 @@ const App = () => (
             <Route path="/live-scans" element={<LiveScans />} />
             <Route path="/missing" element={<MissingItems />} />
             <Route path="/reports" element={<Reports />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
