@@ -209,37 +209,49 @@ export class RFIDScanner {
   }
 
   private async startBatteryMonitoring() {
+    console.log('🔋 Starting battery monitoring...');
     // Get initial battery level
     await this.checkBattery();
     
     // Check battery every 30 seconds
     this.batteryCheckInterval = window.setInterval(async () => {
+      console.log('🔋 Periodic battery check (30s interval)...');
       await this.checkBattery();
     }, 30000);
+    console.log('✅ Battery monitoring started with 30s interval');
   }
 
   private async checkBattery() {
-    if (!this.writeCharacteristic) return;
+    if (!this.writeCharacteristic) {
+      console.warn('⚠️ Cannot check battery - no write characteristic');
+      return;
+    }
     
     try {
       console.log('🔋 Requesting battery level...');
       await this.writeCharacteristic.writeValue(GET_BATTERY_COMMAND as any);
+      console.log('✅ Battery command sent successfully');
     } catch (error: any) {
-      console.error('Battery check failed:', error);
+      console.error('❌ Battery check failed:', error);
     }
   }
 
   private handleRfidData(event: { target: { value: DataView } }) {
     const value = event.target.value;
     
-    console.log('Raw RFID data received, byteLength:', value.byteLength);
+    // Log all incoming data for debugging
+    const bytes = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    console.log('📥 Raw data received:', bytes, 'Length:', value.byteLength);
     
     // Check if this is a battery response (command 0x81)
     if (value.byteLength >= 7 && value.getUint8(3) === 0x81) {
       const batteryPercentage = value.getUint8(5);
-      console.log('🔋 Battery level:', batteryPercentage + '%');
+      console.log('🔋 Battery level detected:', batteryPercentage + '%');
       if (this.onBatteryUpdate) {
+        console.log('🔋 Calling onBatteryUpdate callback with:', batteryPercentage);
         this.onBatteryUpdate(batteryPercentage);
+      } else {
+        console.warn('⚠️ onBatteryUpdate callback not set!');
       }
       return;
     }
