@@ -92,6 +92,11 @@ export class RFIDScanner {
         this.updateStatus('Disconnected');
         this.gattServer = null;
         this.writeCharacteristic = null;
+        // Clear battery monitoring on disconnect
+        if (this.batteryCheckInterval) {
+          clearInterval(this.batteryCheckInterval);
+          this.batteryCheckInterval = null;
+        }
       });
 
       this.updateStatus(`Connecting to ${device.name || 'scanner'}...`);
@@ -111,26 +116,22 @@ export class RFIDScanner {
       const notifyCharacteristic = await service.getCharacteristic(NOTIFY_UUID);
       console.log('Notify characteristic obtained');
 
-      console.log('Setting up notification listener...');
-      notifyCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
-        console.log('🔔 NOTIFICATION RECEIVED - Raw event:', event);
-        this.handleRfidData(event as any);
-      });
-      
-      console.log('Starting notifications...');
       await notifyCharacteristic.startNotifications();
-      console.log('Notifications started successfully');
-
-      console.log('Sending scan mode command...');
-      await this.writeCharacteristic.writeValue(SET_SCAN_MODE_COMMAND as any);
+      console.log('Notifications started');
+      
+      notifyCharacteristic.addEventListener('characteristicvaluechanged', this.handleRfidData.bind(this));
+      
+      // Set device to scan mode (0x01) for optimal performance
+      console.log('Setting device to scan mode...');
+      await this.writeCharacteristic!.writeValue(SET_SCAN_MODE_COMMAND as any);
       console.log('Scan mode set');
-
+      
       this.updateStatus('Connected');
-      console.log('=== SCANNER CONNECTED SUCCESSFULLY ===');
-      
-      // Start battery monitoring (check every 30 seconds)
-      this.startBatteryMonitoring();
-      
+      console.log('=== SCANNER CONNECTION COMPLETE ===');
+
+      // Start battery monitoring
+      await this.startBatteryMonitoring();
+
       return true;
     } catch (error: any) {
       console.error('Connection error:', error);
