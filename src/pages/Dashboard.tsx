@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { AnimatedTableCell } from '@/components/AnimatedTableCell';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SessionMode } from '@/lib/rfidScanner';
 
 interface CategoryStats {
   category: string;
@@ -30,7 +32,7 @@ interface CycleInfo {
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
-  const { scanning, scannerStatus, connectScanner, toggleScan, clearScanAttempts } = useScanner();
+  const { scanning, scannerStatus, sessionMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -270,6 +272,35 @@ const Dashboard = () => {
               <span className="font-medium text-sm sm:text-base">Status:</span>
               <ScannerStatus />
             </div>
+            
+            {/* Session Mode Selector */}
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm sm:text-base">Session Mode:</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  {sessionMode === 'S0' && 'Fast scan, most duplicates'}
+                  {sessionMode === 'S1' && 'Balanced for dense areas'}
+                  {sessionMode === 'S2' && 'Fewer duplicates'}
+                  {sessionMode === 'S3' && 'Minimal duplicates'}
+                </span>
+              </div>
+              <Select 
+                value={sessionMode} 
+                onValueChange={(value) => setSessionMode(value as SessionMode)}
+                disabled={scannerStatus === 'Not connected'}
+              >
+                <SelectTrigger className="w-20 sm:w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="S0">S0</SelectItem>
+                  <SelectItem value="S1">S1</SelectItem>
+                  <SelectItem value="S2">S2</SelectItem>
+                  <SelectItem value="S3">S3</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Button onClick={connectScanner} variant="outline" className="h-12 sm:h-10 text-xs sm:text-sm">
                 Connect Scanner
