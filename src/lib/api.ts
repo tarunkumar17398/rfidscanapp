@@ -11,7 +11,7 @@ export const api = {
     return { success: false, message: 'Invalid PIN' };
   },
 
-  // Dashboard stats
+  // Dashboard stats - OPTIMIZED for fast performance
   getStats: async () => {
     try {
       // Get most recent cycle
@@ -25,51 +25,57 @@ export const api = {
 
       const cycle = cycles?.[0] || null;
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
-      const stats = [];
 
-      for (const category of categories) {
-        // Get total items in category
-        const { count: total, error: totalError } = await supabase
+      // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
+      const [inventoryResult, scansResult] = await Promise.all([
+        // Get all inventory items in one query
+        supabase
           .from('inventory')
-          .select('*', { count: 'exact', head: true })
-          .eq('category', category);
+          .select('tag_id, category'),
+        
+        // Get all scans for current cycle in one query (if cycle exists)
+        cycle ? supabase
+          .from('scans')
+          .select('tag_id')
+          .gte('scanned_at', cycle.started_at) : Promise.resolve({ data: [], error: null })
+      ]);
 
-        if (totalError) throw totalError;
+      if (inventoryResult.error) throw inventoryResult.error;
+      if (scansResult.error) throw scansResult.error;
 
-        // Get scanned items in current cycle
+      // Build maps for fast lookups
+      const inventoryByCategory = new Map<string, Set<string>>();
+      
+      for (const item of inventoryResult.data || []) {
+        if (!inventoryByCategory.has(item.category)) {
+          inventoryByCategory.set(item.category, new Set());
+        }
+        inventoryByCategory.get(item.category)!.add(item.tag_id);
+      }
+
+      // Build set of scanned tags for fast lookup
+      const scannedTags = new Set(scansResult.data?.map(s => s.tag_id) || []);
+
+      // Calculate stats for each category
+      const stats = categories.map(category => {
+        const categoryTags = inventoryByCategory.get(category) || new Set();
+        const total = categoryTags.size;
+        
+        // Count how many of this category's tags have been scanned
         let scanned = 0;
-        if (cycle) {
-          // First get all tag_ids for this category
-          const { data: inventoryItems, error: invError } = await supabase
-            .from('inventory')
-            .select('tag_id')
-            .eq('category', category);
-
-          if (invError) throw invError;
-
-          const categoryTagIds = inventoryItems?.map(i => i.tag_id) || [];
-
-          // Then get scans for those tag_ids
-          const { data: scannedItems, error: scannedError } = await supabase
-            .from('scans')
-            .select('tag_id')
-            .gte('scanned_at', cycle.started_at)
-            .in('tag_id', categoryTagIds);
-
-          if (scannedError) throw scannedError;
-          
-          // Count unique tag_ids
-          const uniqueTags = new Set(scannedItems?.map(s => s.tag_id) || []);
-          scanned = uniqueTags.size;
+        for (const tagId of categoryTags) {
+          if (scannedTags.has(tagId)) {
+            scanned++;
+          }
         }
 
-        stats.push({
+        return {
           category,
-          total: total || 0,
+          total,
           scanned,
-          missing: (total || 0) - scanned
-        });
-      }
+          missing: total - scanned
+        };
+      });
 
       return {
         stats,
