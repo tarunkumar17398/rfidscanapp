@@ -10,6 +10,7 @@ interface ScanAttempt {
   time: string;
   success: boolean;
   duplicate: boolean;
+  count: number;
 }
 
 interface ScannerContextType {
@@ -44,29 +45,15 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
   
-  // Cooldown map to prevent duplicate scans (4 second cooldown)
-  const recentScansRef = useState<Map<string, number>>(() => new Map())[0];
-  const COOLDOWN_MS = 4000;
+  // Session-based duplicate tracking (no cooldown, just track scanned tags per session)
+  const sessionScansRef = useState<Set<string>>(() => new Set())[0];
+  const tagCountsRef = useState<Map<string, number>>(() => new Map())[0];
   
-  // Batching for smooth UI updates
+  // Batching for API calls (10 tags or 100ms, whichever comes first)
   const scanBufferRef = useState<Array<{ tagId: string; time: string }>>(() => [])[0];
   const lastBatchTimeRef = useRef(Date.now());
   const scanCountInLastSecondRef = useRef<number[]>([]);
   const lastMilestoneRef = useRef(0);
-
-  // Periodic cleanup of old cooldown entries (runs every 5 seconds)
-  useEffect(() => {
-    const cleanupInterval = setInterval(() => {
-      const now = Date.now();
-      for (const [key, time] of recentScansRef.entries()) {
-        if (now - time > 10000) {
-          recentScansRef.delete(key);
-        }
-      }
-    }, 5000);
-
-    return () => clearInterval(cleanupInterval);
-  }, [recentScansRef]);
 
   // Batched UI updates every 500ms for smooth performance
   useEffect(() => {
@@ -114,14 +101,19 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       // Trigger pulse feedback for batch
       setPulseTrigger(prev => prev + 1);
 
-      // Add to scan attempts (limit to last 100 for performance)
+      // Add to scan attempts with counts (limit to last 100 for performance)
       setScanAttempts(prev => [
-        ...scanBufferRef.map(scan => ({
-          tagId: scan.tagId,
-          time: scan.time,
-          success: true,
-          duplicate: false
-        })),
+        ...scanBufferRef.map(scan => {
+          const count = tagCountsRef.get(scan.tagId) || 1;
+          const isDuplicate = count > 1;
+          return {
+            tagId: scan.tagId,
+            time: scan.time,
+            success: true,
+            duplicate: isDuplicate,
+            count
+          };
+        }),
         ...prev
       ].slice(0, 100));
 
@@ -173,24 +165,26 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     scanner.setOnStatusChange(setScannerStatus);
     scanner.setOnBatteryUpdate(setBatteryPercentage);
     scanner.setOnTagScanned(async (tagId) => {
-      // Check cooldown - ignore if scanned within last 4 seconds
-      const now = Date.now();
-      const lastScanTime = recentScansRef.get(tagId);
+      // Immediate processing - no cooldown!
+      setLastScannedTag(tagId);
       
-      if (lastScanTime && (now - lastScanTime) < COOLDOWN_MS) {
-        console.log(`Tag ${tagId} ignored - within cooldown period`);
-        return; // Ignore this scan completely
+      // Track duplicate status
+      const isDuplicate = sessionScansRef.has(tagId);
+      const currentCount = (tagCountsRef.get(tagId) || 0) + 1;
+      
+      if (!isDuplicate) {
+        sessionScansRef.add(tagId);
+        console.log(`✓ New tag: ${tagId}`);
+      } else {
+        console.log(`↻ Duplicate: ${tagId} (count: ${currentCount})`);
       }
       
-      // Update cooldown timestamp
-      recentScansRef.set(tagId, now);
-      
-      setLastScannedTag(tagId);
-      console.log('Tag scanned:', tagId);
+      // Update count
+      tagCountsRef.set(tagId, currentCount);
       
       const scanTime = new Date().toLocaleString();
       
-      // Add to buffer for batched processing (optimistic UI)
+      // Add to buffer for immediate processing
       scanBufferRef.push({ tagId, time: scanTime });
     });
 
@@ -232,6 +226,8 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     setScanRate(0);
     lastMilestoneRef.current = 0;
     scanCountInLastSecondRef.current = [];
+    sessionScansRef.clear();
+    tagCountsRef.clear();
   };
 
   return (
