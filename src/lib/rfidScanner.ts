@@ -49,6 +49,17 @@ const SET_SCAN_MODE_COMMAND = finalizeCommand(SET_SCAN_MODE_BASE);
 const GET_BATTERY_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x81, 0x00]);
 const GET_BATTERY_COMMAND = finalizeCommand(GET_BATTERY_BASE);
 
+// Session control commands (0x8C - Set Inventory Parameters)
+// Format: [Header, Addr, Cmd, Len, Session, Target, ...reserved]
+const createSessionCommand = (session: number): Uint8Array => {
+  // Session: 0=S0, 1=S1, 2=S2, 3=S3
+  // Target: 0=A, 1=B (we use 0 for default)
+  const base = new Uint8Array([0xCF, 0xFF, 0x00, 0x8C, 0x09, session, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+  return finalizeCommand(base);
+};
+
+export type SessionMode = 'S0' | 'S1' | 'S2' | 'S3';
+
 export class RFIDScanner {
   private gattServer: BluetoothRemoteGATTServer | null = null;
   private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
@@ -173,6 +184,27 @@ export class RFIDScanner {
     } catch (error: any) {
       console.error('Stop scan failed:', error);
       this.updateStatus(`Stop scan failed: ${error.message}`);
+    }
+  }
+
+  async setSession(session: SessionMode): Promise<void> {
+    if (!this.writeCharacteristic) {
+      console.error('Cannot set session - not connected');
+      return;
+    }
+
+    const sessionMap = { 'S0': 0, 'S1': 1, 'S2': 2, 'S3': 3 };
+    const sessionValue = sessionMap[session];
+
+    try {
+      console.log(`📡 Setting session to ${session}...`);
+      const command = createSessionCommand(sessionValue);
+      await this.writeCharacteristic.writeValue(command as any);
+      console.log(`Session set to ${session} successfully`);
+      this.updateStatus(`Session: ${session}`);
+    } catch (error: any) {
+      console.error('Set session failed:', error);
+      this.updateStatus(`Set session failed: ${error.message}`);
     }
   }
 

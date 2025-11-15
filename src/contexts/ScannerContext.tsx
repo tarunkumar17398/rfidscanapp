@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { RFIDScanner } from '@/lib/rfidScanner';
+import { RFIDScanner, SessionMode } from '@/lib/rfidScanner';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { syncManager } from '@/lib/syncManager';
@@ -23,11 +23,13 @@ interface ScannerContextType {
   totalScans: number;
   scanRate: number;
   pulseTrigger: number;
+  sessionMode: SessionMode;
   clearScanAttempts: () => void;
   connectScanner: () => Promise<boolean>;
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
   toggleScan: () => Promise<void>;
+  setSessionMode: (mode: SessionMode) => Promise<void>;
 }
 
 const ScannerContext = createContext<ScannerContextType | undefined>(undefined);
@@ -42,6 +44,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [totalScans, setTotalScans] = useState(0);
   const [scanRate, setScanRate] = useState(0);
   const [pulseTrigger, setPulseTrigger] = useState(0);
+  const [sessionMode, setSessionModeState] = useState<SessionMode>('S1');
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
   
@@ -230,6 +233,19 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     tagCountsRef.clear();
   };
 
+  const setSessionMode = async (mode: SessionMode) => {
+    await scanner.setSession(mode);
+    setSessionModeState(mode);
+    toast({
+      title: `Session Mode: ${mode}`,
+      description: mode === 'S0' ? 'Max speed, most duplicates' :
+                   mode === 'S1' ? 'Balanced (recommended for dense areas)' :
+                   mode === 'S2' ? 'Fewer duplicates, slower discovery' :
+                   'Minimal duplicates, one-time reads',
+      duration: 3000
+    });
+  };
+
   return (
     <ScannerContext.Provider
       value={{
@@ -242,11 +258,13 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         totalScans,
         scanRate,
         pulseTrigger,
+        sessionMode,
         clearScanAttempts,
         connectScanner,
         startScan,
         stopScan,
         toggleScan,
+        setSessionMode,
       }}
     >
       {children}
