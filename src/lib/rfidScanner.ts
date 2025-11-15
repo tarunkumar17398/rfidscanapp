@@ -46,7 +46,7 @@ const STOP_SCAN_COMMAND = finalizeCommand(STOP_SCAN_BASE);
 const SET_SCAN_MODE_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x8E, 0x09, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 const SET_SCAN_MODE_COMMAND = finalizeCommand(SET_SCAN_MODE_BASE);
 
-const GET_BATTERY_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x81, 0x00]);
+const GET_BATTERY_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x83, 0x00]);
 const GET_BATTERY_COMMAND = finalizeCommand(GET_BATTERY_BASE);
 
 // Session control commands (0x8C - Set Inventory Parameters)
@@ -243,9 +243,9 @@ export class RFIDScanner {
     const bytes = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' ');
     console.log('📥 Raw data received:', bytes, 'Length:', value.byteLength);
     
-    // Check if this is a battery response (command 0x81)
-    if (value.byteLength >= 7 && value.getUint8(3) === 0x81) {
-      const batteryPercentage = value.getUint8(5);
+    // Check if this is a battery response (command 0x83)
+    if (value.byteLength >= 7 && value.getUint8(3) === 0x83) {
+      const batteryPercentage = value.getUint8(6);  // Battery % is at byte 6 per official SDK
       console.log('🔋 Battery level detected:', batteryPercentage + '%');
       if (this.onBatteryUpdate) {
         console.log('🔋 Calling onBatteryUpdate callback with:', batteryPercentage);
