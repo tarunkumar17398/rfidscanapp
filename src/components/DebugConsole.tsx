@@ -62,20 +62,20 @@ export const DebugConsole = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full"
+        className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90"
         size="icon"
       >
-        <Terminal className="h-5 w-5" />
+        <Terminal className="h-6 w-6" />
       </Button>
     );
   }
 
   return (
-    <Card className="fixed bottom-4 right-4 z-50 w-[90vw] max-w-2xl h-96 flex flex-col shadow-lg">
-      <div className="flex items-center justify-between p-3 border-b">
+    <Card className="fixed bottom-4 right-4 z-50 w-[90vw] max-w-2xl h-[60vh] flex flex-col shadow-2xl border-2">
+      <div className="flex items-center justify-between p-4 border-b bg-muted">
         <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4" />
-          <span className="font-semibold text-sm">Debug Console</span>
+          <Terminal className="h-5 w-5" />
+          <span className="font-semibold">Debug Console</span>
         </div>
         <div className="flex gap-2">
           <Button

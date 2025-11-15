@@ -7,6 +7,8 @@ export const ScannerStatus = () => {
   const isConnected = scannerStatus.toLowerCase().includes('connected') || 
                       scannerStatus.toLowerCase().includes('scanning');
   
+  console.log('ScannerStatus render - Battery:', batteryPercentage, 'Status:', scannerStatus, 'Connected:', isConnected);
+  
   const getBatteryColor = () => {
     if (!batteryPercentage) return 'text-muted-foreground';
     if (batteryPercentage > 50) return 'text-green-500';
@@ -24,13 +26,15 @@ export const ScannerStatus = () => {
         <span>{scannerStatus}</span>
       </Badge>
       
-      {isConnected && batteryPercentage !== null && (
+      {isConnected && (
         <Badge 
           variant="outline"
           className="flex items-center gap-1.5 px-2 sm:px-3 py-1 text-xs sm:text-sm"
         >
           <Battery className={`h-3 w-3 sm:h-4 sm:w-4 ${getBatteryColor()}`} />
-          <span className={getBatteryColor()}>{batteryPercentage}%</span>
+          <span className={getBatteryColor()}>
+            {batteryPercentage !== null ? `${batteryPercentage}%` : 'Checking...'}
+          </span>
         </Badge>
       )}
     </div>
