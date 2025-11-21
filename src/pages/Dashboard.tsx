@@ -132,25 +132,12 @@ const Dashboard = () => {
         Total: items.length
       });
 
-      // Insert items into database for each category
-      let totalInserted = 0;
+      // STEP 1: Prepare ALL items for insertion first (don't delete yet)
+      const allInventoryData = [];
+      
       for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
-        console.log(`Processing category ${category}: ${categoryItems.length} items`);
-        if (categoryItems.length === 0) continue;
-
-        // First, delete ALL existing items for this category to avoid duplicates
-        console.log(`Deleting existing ${category} items...`);
-        const { error: deleteError } = await supabase
-          .from('inventory')
-          .delete()
-          .eq('category', category);
-
-        if (deleteError) {
-          console.error(`Error deleting ${category}:`, deleteError);
-          throw deleteError;
-        }
-
-        // Prepare all items for insertion
+        console.log(`Preparing category ${category}: ${categoryItems.length} items`);
+        
         const inventoryData = categoryItems.map(item => {
           const hasRfid = Boolean(item['RFID-EPC']?.trim());
           return {
@@ -163,28 +150,40 @@ const Dashboard = () => {
             has_rfid_tag: hasRfid,
           };
         });
-
-        // Insert all new items in batches of 1000 (Supabase limit)
-        const BATCH_SIZE = 1000;
         
-        for (let i = 0; i < inventoryData.length; i += BATCH_SIZE) {
-          const batch = inventoryData.slice(i, i + BATCH_SIZE);
-          console.log(`Inserting batch ${Math.floor(i / BATCH_SIZE) + 1} for ${category}: ${batch.length} items`);
-          
-          const { error } = await supabase
-            .from('inventory')
-            .insert(batch);
+        allInventoryData.push(...inventoryData);
+      }
 
-          if (error) {
-            console.error(`Error inserting ${category} batch:`, error);
-            throw error;
-          }
-          
-          console.log(`Successfully inserted ${batch.length} items in batch`);
-          totalInserted += batch.length;
+      // STEP 2: Delete ALL existing inventory items at once
+      console.log('Deleting all existing inventory...');
+      const { error: deleteError } = await supabase
+        .from('inventory')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (deleteError) {
+        console.error('Error deleting inventory:', deleteError);
+        throw deleteError;
+      }
+
+      // STEP 3: Insert all new items in batches of 1000 (Supabase limit)
+      const BATCH_SIZE = 1000;
+      let totalInserted = 0;
+      
+      for (let i = 0; i < allInventoryData.length; i += BATCH_SIZE) {
+        const batch = allInventoryData.slice(i, i + BATCH_SIZE);
+        console.log(`Inserting batch: ${batch.length} items (${i + 1} to ${i + batch.length} of ${allInventoryData.length})`);
+        
+        const { error: insertError } = await supabase
+          .from('inventory')
+          .insert(batch);
+
+        if (insertError) {
+          console.error('Error inserting batch:', insertError);
+          throw insertError;
         }
-        
-        console.log(`Completed ${category}: ${categoryItems.length} items`);
+
+        totalInserted += batch.length;
       }
 
       // Count items with and without RFID tags
