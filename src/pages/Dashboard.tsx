@@ -97,6 +97,7 @@ const Dashboard = () => {
 
       items.forEach(item => {
         const code = item['ITEM CODE'].substring(0, 2).toUpperCase();
+        console.log('Processing item:', item['ITEM CODE'], 'Code:', code);
         for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
           if (code === prefix) {
             itemsByCategory[category].push(item);
@@ -105,16 +106,29 @@ const Dashboard = () => {
         }
       });
 
+      console.log('Items grouped by category:', {
+        Brass: itemsByCategory['Brass'].length,
+        Iron: itemsByCategory['Iron'].length,
+        Wood: itemsByCategory['Wood'].length,
+        'Tanjore Paintings': itemsByCategory['Tanjore Paintings'].length
+      });
+
       // Insert items into database for each category
       let totalInserted = 0;
       for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+        console.log(`Processing category ${category}: ${categoryItems.length} items`);
         if (categoryItems.length === 0) continue;
 
         // Clear existing items for this category
-        await supabase
+        const { error: deleteError } = await supabase
           .from('inventory')
           .delete()
           .eq('category', category);
+
+        if (deleteError) {
+          console.error(`Error deleting ${category}:`, deleteError);
+          throw deleteError;
+        }
 
         // Insert new items with has_rfid_tag flag
         const inventoryData = categoryItems.map(item => {
@@ -130,11 +144,18 @@ const Dashboard = () => {
           };
         });
 
-        const { error } = await supabase
+        console.log(`Inserting ${inventoryData.length} items for ${category}`);
+        const { error, data } = await supabase
           .from('inventory')
-          .insert(inventoryData);
+          .insert(inventoryData)
+          .select();
 
-        if (error) throw error;
+        if (error) {
+          console.error(`Error inserting ${category}:`, error);
+          throw error;
+        }
+        
+        console.log(`Successfully inserted ${data?.length || 0} items for ${category}`);
         totalInserted += categoryItems.length;
       }
 
