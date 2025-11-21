@@ -15,6 +15,14 @@ import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { AnimatedTableCell } from '@/components/AnimatedTableCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SessionMode } from '@/lib/rfidScanner';
+import { fetchInventoryFromAPI, InventoryItem } from '@/services/inventoryApi';
+
+const CATEGORY_CODES: Record<string, string> = {
+  'Brass': 'BR',
+  'Iron': 'IR',
+  'Wood': 'WD',
+  'Tanjore Paintings': 'TP',
+};
 
 interface CategoryStats {
   category: string;
@@ -43,6 +51,9 @@ const Dashboard = () => {
       return;
     }
 
+    // Auto-sync inventory on startup
+    autoSyncInventory();
+
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
 
@@ -68,6 +79,69 @@ const Dashboard = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const autoSyncInventory = async () => {
+    try {
+      console.log('Auto-syncing inventory from CK Inventory API...');
+      const items = await fetchInventoryFromAPI();
+      
+      // Group items by category based on ITEM CODE prefix
+      const itemsByCategory: Record<string, InventoryItem[]> = {
+        'Brass': [],
+        'Iron': [],
+        'Wood': [],
+        'Tanjore Paintings': [],
+      };
+
+      items.forEach(item => {
+        const code = item['ITEM CODE'].substring(0, 2).toUpperCase();
+        for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
+          if (code === prefix) {
+            itemsByCategory[category].push(item);
+            break;
+          }
+        }
+      });
+
+      // Insert items into database for each category
+      let totalInserted = 0;
+      for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+        if (categoryItems.length === 0) continue;
+
+        // Clear existing items for this category
+        await supabase
+          .from('inventory')
+          .delete()
+          .eq('category', category);
+
+        // Insert new items
+        const inventoryData = categoryItems.map(item => ({
+          category,
+          item_code: item['ITEM CODE'],
+          particulars: item['PARTICULARS'],
+          size: item['SIZE'],
+          weight: item['Weight'],
+          tag_id: item['RFID-EPC'],
+        }));
+
+        const { error } = await supabase
+          .from('inventory')
+          .insert(inventoryData);
+
+        if (error) throw error;
+        totalInserted += categoryItems.length;
+      }
+
+      console.log(`Auto-sync complete: ${totalInserted} items synced`);
+      toast({
+        title: 'Inventory Synced',
+        description: `${totalInserted} items loaded from CK Inventory`,
+      });
+    } catch (error: any) {
+      console.error('Auto-sync failed:', error);
+      // Silent fail - don't show error toast on startup
+    }
+  };
 
   const fetchStats = async () => {
     try {
