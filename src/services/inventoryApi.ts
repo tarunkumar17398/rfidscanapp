@@ -13,18 +13,31 @@ export interface APIResponse {
 }
 
 export const fetchInventoryFromAPI = async (): Promise<InventoryItem[]> => {
+  console.log('Fetching from CK Inventory API...');
   const apiUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
   
-  const response = await fetch(apiUrl);
+  // Try with limit parameter to get all items
+  const urlWithLimit = `${apiUrl}?limit=10000`;
+  
+  console.log(`API URL: ${urlWithLimit}`);
+  const response = await fetch(urlWithLimit);
+  
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
   
   const result = await response.json();
+  console.log('API Response structure:', {
+    hasData: !!result.data,
+    dataLength: result.data?.length,
+    hasCount: !!result.count,
+    count: result.count,
+    allKeys: Object.keys(result)
+  });
   
   // CRITICAL: Use result.data directly
   const items = result.data || [];
-  console.log(`✓ Fetched ${items.length} items`);
+  console.log(`✓ API returned ${items.length} items (count field: ${result.count || 'N/A'})`);
   
   return items;
 };
