@@ -57,46 +57,54 @@ const Dashboard = () => {
     let statsInterval: NodeJS.Timeout | null = null;
 
     const startStatsPolling = () => {
-      console.log('Starting stats polling...');
+      console.log('✓ Starting stats polling (every 2 seconds)...');
       fetchStats();
       statsInterval = setInterval(fetchStats, 2000);
     };
 
     const stopStatsPolling = () => {
       if (statsInterval) {
-        console.log('Stopping stats polling...');
+        console.log('✓ Stopping stats polling...');
         clearInterval(statsInterval);
         statsInterval = null;
       }
     };
 
-    // Auto-sync inventory only once per day to avoid constant re-imports
+    // Check if sync is needed
     const lastSyncDate = localStorage.getItem('lastInventorySync');
     const today = new Date().toDateString();
     
+    console.log('=== DASHBOARD INITIALIZATION ===');
+    console.log(`Today: ${today}`);
+    console.log(`Last sync: ${lastSyncDate || 'never'}`);
+    console.log(`Sync needed: ${lastSyncDate !== today}`);
+    
     if (lastSyncDate !== today) {
-      console.log('=== STARTING DAILY AUTO-SYNC ===');
-      console.log(`Last sync: ${lastSyncDate || 'never'}`);
+      console.log('→ Will run auto-sync...');
       
-      // Stop polling during sync
+      // Stop any existing polling and show loading
+      stopStatsPolling();
       setIsSyncing(true);
       
       autoSyncInventory()
         .then(() => {
           localStorage.setItem('lastInventorySync', today);
-          console.log('=== AUTO-SYNC COMPLETE - Next sync tomorrow ===');
+          console.log('=== AUTO-SYNC SUCCESS ===');
         })
         .catch((error) => {
           console.error('=== AUTO-SYNC FAILED ===', error);
+          toast({
+            title: 'Sync Failed',
+            description: 'Failed to sync inventory from API',
+            variant: 'destructive'
+          });
         })
         .finally(() => {
           setIsSyncing(false);
-          // Start polling after sync completes
           startStatsPolling();
         });
     } else {
-      console.log(`✓ Already synced today (${today}), skipping auto-sync`);
-      // Start polling immediately if no sync needed
+      console.log('→ Already synced today, skipping auto-sync');
       startStatsPolling();
     }
 
