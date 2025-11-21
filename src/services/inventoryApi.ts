@@ -17,18 +17,28 @@ export async function fetchInventoryFromAPI(): Promise<InventoryItem[]> {
     const response = await fetch('https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export');
     
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const result: APIResponse = await response.json();
+    
+    // Debug logging
+    console.log('API Response:', result);
+    console.log('Item count:', result.count);
+    console.log('Data array length:', result.data?.length);
     
     if (!result.success || !result.data) {
       throw new Error('Invalid API response');
     }
     
+    // Validate data completeness
+    if (result.count !== result.data.length) {
+      console.warn(`⚠️ Data mismatch: Expected ${result.count} items, received ${result.data.length}`);
+    }
+    
     return result.data;
   } catch (error) {
-    console.error('Failed to fetch inventory:', error);
+    console.error('Error fetching inventory from API:', error);
     throw error;
   }
 }
