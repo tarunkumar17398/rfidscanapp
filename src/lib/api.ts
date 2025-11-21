@@ -29,9 +29,11 @@ export const api = {
       // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
       const [inventoryResult, scansResult] = await Promise.all([
         // Get all inventory items (both with and without RFID tags)
+        // Set high limit to fetch all items (default is 1000)
         supabase
           .from('inventory')
-          .select('tag_id, category, has_rfid_tag'),
+          .select('tag_id, category, has_rfid_tag')
+          .limit(10000),
         
         // Get all scans for current cycle in one query (if cycle exists)
         cycle ? supabase
