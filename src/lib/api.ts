@@ -45,6 +45,8 @@ export const api = {
       if (inventoryResult.error) throw inventoryResult.error;
       if (scansResult.error) throw scansResult.error;
 
+      console.log(`[getStats] Fetched ${inventoryResult.data?.length || 0} inventory items from database`);
+
       // Build maps for fast lookups - separate with/without RFID
       const inventoryByCategory = new Map<string, { withRfid: Set<string>, withoutRfid: number }>();
       
@@ -87,6 +89,8 @@ export const api = {
           missing: totalWithRfid - scanned
         };
       });
+
+      console.log('[getStats] Calculated stats:', stats);
 
       return {
         stats,
