@@ -13,47 +13,32 @@ export interface APIResponse {
 }
 
 export const fetchInventoryFromAPI = async (): Promise<InventoryItem[]> => {
-  console.log('=== FETCHING FROM CK INVENTORY API (WITH PAGINATION) ===');
-  const baseUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
+  console.log('=== FETCHING FROM CK INVENTORY API ===');
+  const apiUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
   
-  const allItems: InventoryItem[] = [];
-  let offset = 0;
-  const limit = 1000; // Fetch in batches of 1000
-  let hasMore = true;
-  
-  while (hasMore) {
-    const url = `${baseUrl}?limit=${limit}&offset=${offset}`;
-    console.log(`Fetching batch: offset=${offset}, limit=${limit}`);
-    
-    const response = await fetch(url);
+  try {
+    console.log('Calling API (no pagination - fetching all at once)...');
+    const response = await fetch(apiUrl);
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
     const result = await response.json();
-    const batchItems = result.data || [];
+    const items = result.data || [];
     
-    console.log(`  ✓ Received ${batchItems.length} items in this batch`);
+    console.log(`✓ API Response:`, {
+      totalItems: items.length,
+      hasMoreIndicator: !!result.nextPage,
+      count: result.count,
+      allKeys: Object.keys(result)
+    });
     
-    if (batchItems.length === 0) {
-      hasMore = false;
-      console.log('  → No more items, pagination complete');
-    } else {
-      allItems.push(...batchItems);
-      offset += limit;
-      
-      // If we got fewer items than the limit, we've reached the end
-      if (batchItems.length < limit) {
-        hasMore = false;
-        console.log(`  → Last batch (${batchItems.length} < ${limit}), pagination complete`);
-      } else {
-        console.log(`  → More items available, continuing... (total so far: ${allItems.length})`);
-      }
-    }
+    console.log(`=== FETCH COMPLETE: ${items.length} total items ===`);
+    
+    return items;
+  } catch (error) {
+    console.error('❌ API Fetch Error:', error);
+    throw error;
   }
-  
-  console.log(`=== PAGINATION COMPLETE: ${allItems.length} total items fetched ===`);
-  
-  return allItems;
 };
