@@ -29,33 +29,48 @@ export const api = {
       const cycle = cycles?.[0] || null;
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
 
-      console.log('[getStats] Fetching inventory with range 0-9999...');
+      console.log('[getStats] Fetching ALL inventory items...');
       
-      // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
-      const [inventoryResult, scansResult] = await Promise.all([
-        // Get all inventory items (both with and without RFID tags)
-        // Use range() to fetch more than default 1000 limit
-        supabase
+      // Fetch ALL inventory items in batches if needed
+      let allInventory: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data, error } = await supabase
           .from('inventory')
           .select('tag_id, category, has_rfid_tag')
-          .range(0, 9999),
+          .range(from, from + batchSize - 1);
         
-        // Get all scans for current cycle in one query (if cycle exists)
-        cycle ? supabase
-          .from('scans')
-          .select('tag_id')
-          .gte('scanned_at', cycle.started_at) : Promise.resolve({ data: [], error: null })
-      ]);
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          allInventory = allInventory.concat(data);
+          from += batchSize;
+          
+          if (data.length < batchSize) {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+      
+      console.log(`[getStats] ✓ Fetched ${allInventory.length} inventory items from database`);
+      
+      // Get all scans for current cycle
+      const scansResult = cycle ? await supabase
+        .from('scans')
+        .select('tag_id')
+        .gte('scanned_at', cycle.started_at) : { data: [], error: null };
 
-      if (inventoryResult.error) throw inventoryResult.error;
       if (scansResult.error) throw scansResult.error;
-
-      console.log(`[getStats] ✓ Fetched ${inventoryResult.data?.length || 0} inventory items from database`);
 
       // Build maps for fast lookups - separate with/without RFID
       const inventoryByCategory = new Map<string, { withRfid: Set<string>, withoutRfid: number }>();
       
-      for (const item of inventoryResult.data || []) {
+      for (const item of allInventory) {
         if (!inventoryByCategory.has(item.category)) {
           inventoryByCategory.set(item.category, { withRfid: new Set(), withoutRfid: 0 });
         }
