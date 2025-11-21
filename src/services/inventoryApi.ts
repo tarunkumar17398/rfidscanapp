@@ -12,26 +12,19 @@ export interface APIResponse {
   data: InventoryItem[];
 }
 
-export async function fetchInventoryFromAPI(): Promise<InventoryItem[]> {
-  try {
-    const response = await fetch('https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export');
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    // Debug - remove after fixing
-    console.log('API returned count:', result.count);
-    console.log('API returned data length:', result.data?.length);
-    console.log('First item:', result.data?.[0]);
-    
-    // CRITICAL: Just return result.data directly
-    return result.data || [];
-    
-  } catch (error) {
-    console.error('Error fetching inventory:', error);
-    return []; // Return empty array on error
+export const fetchInventoryFromAPI = async (): Promise<InventoryItem[]> => {
+  const apiUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
+  
+  const response = await fetch(apiUrl);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
   }
-}
+  
+  const result = await response.json();
+  
+  // CRITICAL: Use result.data directly
+  const items = result.data || [];
+  console.log(`✓ Fetched ${items.length} items`);
+  
+  return items;
+};
