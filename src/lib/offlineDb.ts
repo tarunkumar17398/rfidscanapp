@@ -57,13 +57,25 @@ class OfflineDB {
     if (!this.db) await this.init();
     
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('synced');
-      
-      const request = index.getAll(IDBKeyRange.only(false));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      try {
+        const transaction = this.db!.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        
+        // Get all records and filter in JavaScript for better compatibility
+        const request = store.getAll();
+        request.onsuccess = () => {
+          // Filter to only get unsynced items
+          const results = request.result.filter(scan => !scan.synced);
+          resolve(results);
+        };
+        request.onerror = () => {
+          console.error('Error getting pending scans:', request.error);
+          resolve([]); // Return empty array on error
+        };
+      } catch (error) {
+        console.error('Error in getPendingScans:', error);
+        resolve([]); // Return empty array on error
+      }
     });
   }
 
@@ -94,27 +106,42 @@ class OfflineDB {
     if (!this.db) await this.init();
     
     return new Promise((resolve, reject) => {
-      const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const index = store.index('synced');
-      
-      const request = index.openCursor(IDBKeyRange.only(true));
-      request.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest).result;
-        if (cursor) {
-          store.delete(cursor.primaryKey);
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      request.onerror = () => reject(request.error);
+      try {
+        const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        
+        // Get all records and delete synced ones
+        const request = store.openCursor();
+        request.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest).result;
+          if (cursor) {
+            if (cursor.value.synced === true) {
+              store.delete(cursor.primaryKey);
+            }
+            cursor.continue();
+          } else {
+            resolve();
+          }
+        };
+        request.onerror = () => {
+          console.error('Error deleting synced items:', request.error);
+          resolve(); // Resolve anyway to avoid blocking
+        };
+      } catch (error) {
+        console.error('Error in deleteSynced:', error);
+        resolve(); // Resolve anyway to avoid blocking
+      }
     });
   }
 
   async getPendingCount(): Promise<number> {
-    const scans = await this.getPendingScans();
-    return scans.length;
+    try {
+      const scans = await this.getPendingScans();
+      return scans.length;
+    } catch (error) {
+      console.error('Error getting pending count:', error);
+      return 0;
+    }
   }
 }
 
