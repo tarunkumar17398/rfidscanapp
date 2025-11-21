@@ -153,19 +153,25 @@ const Dashboard = () => {
           };
         });
 
-        console.log(`Inserting ${inventoryData.length} items for ${category}`);
-        const { error, data } = await supabase
-          .from('inventory')
-          .insert(inventoryData)
-          .select();
+        // Batch insert in chunks of 1000 (Supabase limit)
+        const BATCH_SIZE = 1000;
+        for (let i = 0; i < inventoryData.length; i += BATCH_SIZE) {
+          const batch = inventoryData.slice(i, i + BATCH_SIZE);
+          console.log(`Inserting batch ${Math.floor(i / BATCH_SIZE) + 1} for ${category}: ${batch.length} items`);
+          
+          const { error, data } = await supabase
+            .from('inventory')
+            .insert(batch)
+            .select();
 
-        if (error) {
-          console.error(`Error inserting ${category}:`, error);
-          throw error;
+          if (error) {
+            console.error(`Error inserting ${category} batch:`, error);
+            throw error;
+          }
+          
+          console.log(`Successfully inserted ${data?.length || 0} items in batch`);
+          totalInserted += batch.length;
         }
-        
-        console.log(`Successfully inserted ${data?.length || 0} items for ${category}`);
-        totalInserted += categoryItems.length;
       }
 
       // Count items with and without RFID tags
