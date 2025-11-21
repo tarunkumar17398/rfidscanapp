@@ -141,7 +141,7 @@ const Dashboard = () => {
 
         // Insert new items with has_rfid_tag flag
         const inventoryData = categoryItems.map(item => {
-          const hasRfid = item['RFID-EPC'] && item['RFID-EPC'].trim() !== '';
+          const hasRfid = Boolean(item['RFID-EPC']?.trim());
           return {
             category,
             item_code: item['ITEM CODE'],
@@ -169,7 +169,7 @@ const Dashboard = () => {
       }
 
       // Count items with and without RFID tags
-      const itemsWithRfid = items.filter(item => item['RFID-EPC'] && item['RFID-EPC'].trim() !== '').length;
+      const itemsWithRfid = items.filter(item => Boolean(item['RFID-EPC']?.trim())).length;
       const itemsWithoutRfid = items.length - itemsWithRfid;
 
       console.log(`Auto-sync complete: ${totalInserted} items synced (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`);
