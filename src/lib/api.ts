@@ -254,7 +254,8 @@ export const api = {
         const { data: allItems, error: itemsError } = await supabase
           .from('inventory')
           .select('*')
-          .eq('category', category);
+          .eq('category', category)
+          .limit(10000);
 
         if (itemsError) throw itemsError;
 
@@ -334,7 +335,8 @@ export const api = {
       // Get all inventory items by category
       const { data: inventory, error: invError } = await supabase
         .from('inventory')
-        .select('*');
+        .select('*')
+        .limit(10000);
 
       if (invError) throw invError;
 
