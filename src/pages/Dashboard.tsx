@@ -53,18 +53,9 @@ const Dashboard = () => {
       return;
     }
 
-    // Auto-sync inventory on startup - only if not already synced today
-    const lastSyncDate = localStorage.getItem('lastInventorySync');
-    const today = new Date().toDateString();
-    
-    if (lastSyncDate !== today) {
-      console.log('Running auto-sync (last sync was:', lastSyncDate || 'never', ')');
-      autoSyncInventory().then(() => {
-        localStorage.setItem('lastInventorySync', today);
-      });
-    } else {
-      console.log('Skipping auto-sync (already synced today)');
-    }
+    // Auto-sync inventory on every app startup (removed daily limit for debugging)
+    console.log('Running auto-sync on startup...');
+    autoSyncInventory();
 
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
@@ -94,8 +85,10 @@ const Dashboard = () => {
 
   const autoSyncInventory = async () => {
     try {
-      console.log('Auto-syncing inventory from CK Inventory API...');
+      console.log('=== AUTO-SYNC START ===');
+      console.log('Fetching inventory from CK Inventory API...');
       const items = await fetchInventoryFromAPI();
+      console.log(`✓ Received ${items.length} total items from API`);
       
       // Group items by category based on ITEM CODE prefix (characters 2-4, after "CK")
       const itemsByCategory: Record<string, InventoryItem[]> = {
@@ -105,10 +98,10 @@ const Dashboard = () => {
         'Tanjore Paintings': [],
       };
 
-      items.forEach(item => {
+      items.forEach((item, index) => {
         const itemCode = item['ITEM CODE'];
         if (!itemCode || itemCode.length < 4) {
-          console.warn('Item with invalid code:', item);
+          console.warn(`Item ${index + 1} has invalid code:`, item);
           return;
         }
         
@@ -124,7 +117,7 @@ const Dashboard = () => {
         }
       });
 
-      console.log('Items grouped by category:', {
+      console.log('✓ Items grouped by category:', {
         Brass: itemsByCategory['Brass'].length,
         Iron: itemsByCategory['Iron'].length,
         Wood: itemsByCategory['Wood'].length,
@@ -133,10 +126,16 @@ const Dashboard = () => {
       });
 
       // STEP 1: Prepare ALL items for insertion first (don't delete yet)
+      console.log('=== STEP 1: Preparing data for insertion ===');
       const allInventoryData = [];
       
       for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
-        console.log(`Preparing category ${category}: ${categoryItems.length} items`);
+        if (categoryItems.length === 0) {
+          console.log(`  ${category}: 0 items (skipping)`);
+          continue;
+        }
+        
+        console.log(`  ${category}: ${categoryItems.length} items`);
         
         const inventoryData = categoryItems.map(item => {
           const hasRfid = Boolean(item['RFID-EPC']?.trim());
@@ -153,44 +152,56 @@ const Dashboard = () => {
         
         allInventoryData.push(...inventoryData);
       }
+      
+      console.log(`✓ Prepared ${allInventoryData.length} total items for insertion`);
 
       // STEP 2: Delete ALL existing inventory items at once
-      console.log('Deleting all existing inventory...');
+      console.log('=== STEP 2: Deleting all existing inventory ===');
       const { error: deleteError } = await supabase
         .from('inventory')
         .delete()
         .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
       if (deleteError) {
-        console.error('Error deleting inventory:', deleteError);
+        console.error('✗ Error deleting inventory:', deleteError);
         throw deleteError;
       }
+      console.log('✓ All existing inventory deleted');
 
       // STEP 3: Insert all new items in batches of 1000 (Supabase limit)
+      console.log('=== STEP 3: Inserting new items in batches ===');
       const BATCH_SIZE = 1000;
       let totalInserted = 0;
       
       for (let i = 0; i < allInventoryData.length; i += BATCH_SIZE) {
         const batch = allInventoryData.slice(i, i + BATCH_SIZE);
-        console.log(`Inserting batch: ${batch.length} items (${i + 1} to ${i + batch.length} of ${allInventoryData.length})`);
+        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+        const totalBatches = Math.ceil(allInventoryData.length / BATCH_SIZE);
+        
+        console.log(`  Batch ${batchNum}/${totalBatches}: Inserting ${batch.length} items (items ${i + 1}-${i + batch.length})...`);
         
         const { error: insertError } = await supabase
           .from('inventory')
           .insert(batch);
 
         if (insertError) {
-          console.error('Error inserting batch:', insertError);
+          console.error(`✗ Error inserting batch ${batchNum}:`, insertError);
           throw insertError;
         }
 
         totalInserted += batch.length;
+        console.log(`  ✓ Batch ${batchNum} inserted successfully (${totalInserted}/${allInventoryData.length} total)`);
       }
 
       // Count items with and without RFID tags
       const itemsWithRfid = items.filter(item => Boolean(item['RFID-EPC']?.trim())).length;
       const itemsWithoutRfid = items.length - itemsWithRfid;
 
-      console.log(`Auto-sync complete: ${totalInserted} items synced (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`);
+      console.log('=== AUTO-SYNC COMPLETE ===');
+      console.log(`✓ Total inserted: ${totalInserted} items`);
+      console.log(`  - With RFID: ${itemsWithRfid}`);
+      console.log(`  - Without RFID: ${itemsWithoutRfid}`);
+      
       toast({
         title: 'Inventory Synced',
         description: `${totalInserted} items loaded (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`,
