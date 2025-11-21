@@ -213,7 +213,7 @@ export const api = {
         .select('*')
         .gte('scanned_at', cycle.started_at)
         .order('scanned_at', { ascending: false })
-        .limit(1000);
+        .limit(5000);
 
       if (error) throw error;
 

@@ -210,11 +210,15 @@ const Dashboard = () => {
   const totalScanned = stats.reduce((sum, s) => sum + s.scanned, 0);
   const totalItems = stats.reduce((sum, s) => sum + s.total, 0);
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
+  const totalWithRfid = stats.reduce((sum, s) => sum + (s.totalWithRfid || 0), 0);
+  const totalWithoutRfid = stats.reduce((sum, s) => sum + (s.totalWithoutRfid || 0), 0);
   
   // Animated counters for smooth transitions
   const animatedTotalItems = useAnimatedCounter(totalItems);
   const animatedTotalScanned = useAnimatedCounter(totalScanned);
   const animatedTotalMissing = useAnimatedCounter(totalMissing);
+  const animatedTotalWithRfid = useAnimatedCounter(totalWithRfid);
+  const animatedTotalWithoutRfid = useAnimatedCounter(totalWithoutRfid);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -281,7 +285,7 @@ const Dashboard = () => {
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-primary tabular-nums">{animatedTotalItems}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {stats.reduce((sum, s) => sum + s.totalWithRfid, 0)} with RFID • {stats.reduce((sum, s) => sum + s.totalWithoutRfid, 0)} without
+                {animatedTotalWithRfid} with RFID • {animatedTotalWithoutRfid} without
               </p>
             </CardContent>
           </Card>
