@@ -29,16 +29,16 @@ export const api = {
       const cycle = cycles?.[0] || null;
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
 
-      console.log('[getStats] Fetching inventory with limit 10000...');
+      console.log('[getStats] Fetching inventory with range 0-9999...');
       
       // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
       const [inventoryResult, scansResult] = await Promise.all([
         // Get all inventory items (both with and without RFID tags)
-        // Set high limit to fetch all items (default is 1000)
+        // Use range() to fetch more than default 1000 limit
         supabase
           .from('inventory')
           .select('tag_id, category, has_rfid_tag')
-          .limit(10000),
+          .range(0, 9999),
         
         // Get all scans for current cycle in one query (if cycle exists)
         cycle ? supabase
@@ -259,12 +259,12 @@ export const api = {
       const missing = [];
 
       for (const category of categories) {
-        // Get all items in category
+        // Get all items in category - use range() for more than 1000 items
         const { data: allItems, error: itemsError } = await supabase
           .from('inventory')
           .select('*')
           .eq('category', category)
-          .limit(10000);
+          .range(0, 9999);
 
         if (itemsError) throw itemsError;
 
@@ -341,11 +341,11 @@ export const api = {
 
       if (cycleError) throw cycleError;
 
-      // Get all inventory items by category
+      // Get all inventory items by category - use range() for more than 1000 items
       const { data: inventory, error: invError } = await supabase
         .from('inventory')
         .select('*')
-        .limit(10000);
+        .range(0, 9999);
 
       if (invError) throw invError;
 
