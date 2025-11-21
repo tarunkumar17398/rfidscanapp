@@ -128,18 +128,7 @@ const Dashboard = () => {
         console.log(`Processing category ${category}: ${categoryItems.length} items`);
         if (categoryItems.length === 0) continue;
 
-        // Clear existing items for this category
-        const { error: deleteError } = await supabase
-          .from('inventory')
-          .delete()
-          .eq('category', category);
-
-        if (deleteError) {
-          console.error(`Error deleting ${category}:`, deleteError);
-          throw deleteError;
-        }
-
-        // Insert new items with has_rfid_tag flag
+        // Prepare all items for insertion
         const inventoryData = categoryItems.map(item => {
           const hasRfid = Boolean(item['RFID-EPC']?.trim());
           return {
@@ -153,24 +142,61 @@ const Dashboard = () => {
           };
         });
 
-        // Batch insert in chunks of 1000 (Supabase limit)
+        // Insert all new items first in batches (don't delete old data yet)
         const BATCH_SIZE = 1000;
+        let allBatchesSucceeded = true;
+        
         for (let i = 0; i < inventoryData.length; i += BATCH_SIZE) {
           const batch = inventoryData.slice(i, i + BATCH_SIZE);
           console.log(`Inserting batch ${Math.floor(i / BATCH_SIZE) + 1} for ${category}: ${batch.length} items`);
           
-          const { error, data } = await supabase
+          const { error } = await supabase
             .from('inventory')
-            .insert(batch)
-            .select();
+            .insert(batch);
 
           if (error) {
             console.error(`Error inserting ${category} batch:`, error);
+            allBatchesSucceeded = false;
             throw error;
           }
           
-          console.log(`Successfully inserted ${data?.length || 0} items in batch`);
-          totalInserted += batch.length;
+          console.log(`Successfully inserted ${batch.length} items in batch`);
+        }
+
+        // Only delete old items after ALL new items are successfully inserted
+        if (allBatchesSucceeded) {
+          console.log(`All batches inserted successfully for ${category}, now cleaning up duplicates...`);
+          
+          // Get all items for this category, group by item_code, keep only newest
+          const { data: allItems } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('category', category)
+            .order('created_at', { ascending: false });
+          
+          if (allItems) {
+            const seen = new Set();
+            const toDelete = [];
+            
+            for (const item of allItems) {
+              if (seen.has(item.item_code)) {
+                toDelete.push(item.id);
+              } else {
+                seen.add(item.item_code);
+              }
+            }
+            
+            if (toDelete.length > 0) {
+              console.log(`Removing ${toDelete.length} duplicate items from ${category}`);
+              await supabase
+                .from('inventory')
+                .delete()
+                .in('id', toDelete);
+            }
+          }
+          
+          totalInserted += categoryItems.length;
+          console.log(`Completed ${category}: ${categoryItems.length} items`);
         }
       }
 
