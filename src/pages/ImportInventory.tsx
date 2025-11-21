@@ -140,7 +140,8 @@ const ImportInventory = () => {
             .from('inventory')
             .select('*')
             .eq('category', category)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(10000);
           
           if (allItems) {
             const seen = new Set();
@@ -156,10 +157,15 @@ const ImportInventory = () => {
             
             if (toDelete.length > 0) {
               console.log(`Removing ${toDelete.length} duplicate items from ${category}`);
-              await supabase
-                .from('inventory')
-                .delete()
-                .in('id', toDelete);
+              // Delete in batches to avoid limits
+              const DELETE_BATCH = 1000;
+              for (let i = 0; i < toDelete.length; i += DELETE_BATCH) {
+                const batch = toDelete.slice(i, i + DELETE_BATCH);
+                await supabase
+                  .from('inventory')
+                  .delete()
+                  .in('id', batch);
+              }
             }
           }
           
