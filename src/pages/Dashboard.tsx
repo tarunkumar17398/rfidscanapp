@@ -43,6 +43,7 @@ interface CycleInfo {
 const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { scanning, scannerStatus, sessionMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -53,6 +54,22 @@ const Dashboard = () => {
       return;
     }
 
+    let statsInterval: NodeJS.Timeout | null = null;
+
+    const startStatsPolling = () => {
+      console.log('Starting stats polling...');
+      fetchStats();
+      statsInterval = setInterval(fetchStats, 2000);
+    };
+
+    const stopStatsPolling = () => {
+      if (statsInterval) {
+        console.log('Stopping stats polling...');
+        clearInterval(statsInterval);
+        statsInterval = null;
+      }
+    };
+
     // Auto-sync inventory only once per day to avoid constant re-imports
     const lastSyncDate = localStorage.getItem('lastInventorySync');
     const today = new Date().toDateString();
@@ -60,18 +77,28 @@ const Dashboard = () => {
     if (lastSyncDate !== today) {
       console.log('=== STARTING DAILY AUTO-SYNC ===');
       console.log(`Last sync: ${lastSyncDate || 'never'}`);
-      autoSyncInventory().then(() => {
-        localStorage.setItem('lastInventorySync', today);
-        console.log('=== AUTO-SYNC COMPLETE - Next sync tomorrow ===');
-      }).catch((error) => {
-        console.error('=== AUTO-SYNC FAILED ===', error);
-      });
+      
+      // Stop polling during sync
+      setIsSyncing(true);
+      
+      autoSyncInventory()
+        .then(() => {
+          localStorage.setItem('lastInventorySync', today);
+          console.log('=== AUTO-SYNC COMPLETE - Next sync tomorrow ===');
+        })
+        .catch((error) => {
+          console.error('=== AUTO-SYNC FAILED ===', error);
+        })
+        .finally(() => {
+          setIsSyncing(false);
+          // Start polling after sync completes
+          startStatsPolling();
+        });
     } else {
       console.log(`✓ Already synced today (${today}), skipping auto-sync`);
+      // Start polling immediately if no sync needed
+      startStatsPolling();
     }
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 2000);
 
     // Subscribe to real-time scan updates
     const channel = supabase
@@ -91,7 +118,9 @@ const Dashboard = () => {
       .subscribe();
 
     return () => {
-      clearInterval(interval);
+      if (statsInterval) {
+        clearInterval(statsInterval);
+      }
       supabase.removeChannel(channel);
     };
   }, []);
@@ -302,6 +331,24 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
+      {/* Syncing Overlay */}
+      {isSyncing && (
+        <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="p-8 max-w-md mx-4">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <h3 className="text-xl font-semibold">Syncing Inventory</h3>
+              <p className="text-muted-foreground">
+                Fetching all items from CK Inventory API with pagination...
+              </p>
+              <p className="text-sm text-muted-foreground">
+                This may take a moment for large inventories
+              </p>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
