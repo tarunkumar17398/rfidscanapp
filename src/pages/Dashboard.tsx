@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
-import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText } from 'lucide-react';
+import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ScannerStatus } from '@/components/ScannerStatus';
 import { DebugConsole } from '@/components/DebugConsole';
@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const { scanning, scannerStatus, sessionMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -52,6 +53,12 @@ const Dashboard = () => {
     if (!sessionStorage.getItem('authenticated')) {
       navigate('/');
       return;
+    }
+
+    // Load last sync time
+    const savedSyncTime = localStorage.getItem('lastInventorySyncTime');
+    if (savedSyncTime) {
+      setLastSyncTime(savedSyncTime);
     }
 
     let statsInterval: NodeJS.Timeout | null = null;
@@ -88,7 +95,10 @@ const Dashboard = () => {
       
       autoSyncInventory()
         .then(() => {
+          const now = new Date().toISOString();
           localStorage.setItem('lastInventorySync', today);
+          localStorage.setItem('lastInventorySyncTime', now);
+          setLastSyncTime(now);
           console.log('=== AUTO-SYNC SUCCESS ===');
         })
         .catch((error) => {
@@ -316,6 +326,37 @@ const Dashboard = () => {
     navigate('/');
   };
 
+  const handleForceSync = async () => {
+    console.log('=== FORCE SYNC TRIGGERED BY USER ===');
+    setIsSyncing(true);
+    
+    try {
+      await autoSyncInventory();
+      const now = new Date().toISOString();
+      const today = new Date().toDateString();
+      localStorage.setItem('lastInventorySync', today);
+      localStorage.setItem('lastInventorySyncTime', now);
+      setLastSyncTime(now);
+      
+      toast({
+        title: 'Sync Complete',
+        description: 'Inventory has been refreshed from CK API',
+      });
+      
+      // Refresh stats immediately
+      await fetchStats();
+    } catch (error) {
+      console.error('Force sync error:', error);
+      toast({
+        title: 'Sync Failed',
+        description: 'Failed to sync inventory from API',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const totalScanned = stats.reduce((sum, s) => sum + s.scanned, 0);
   const totalItems = stats.reduce((sum, s) => sum + s.total, 0);
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
@@ -363,11 +404,30 @@ const Dashboard = () => {
             <h1 className="text-2xl sm:text-3xl font-bold">Inventory Dashboard</h1>
             <ConnectionStatus />
           </div>
-          <Button variant="outline" onClick={handleLogout} size="sm" className="h-10 px-3">
-            <LogOut className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleForceSync} 
+              disabled={isSyncing}
+              size="sm" 
+              className="h-10"
+            >
+              <RefreshCw className={`h-4 w-4 sm:mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Sync</span>
+            </Button>
+            <Button variant="outline" onClick={handleLogout} size="sm" className="h-10 px-3">
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
+            </Button>
+          </div>
         </div>
+
+        {/* Last Sync Info */}
+        {lastSyncTime && (
+          <div className="text-sm text-muted-foreground">
+            Last synced: {new Date(lastSyncTime).toLocaleString('en-IN')}
+          </div>
+        )}
 
         {/* Cycle Info Card */}
         {cycleInfo && (
