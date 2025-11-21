@@ -42,31 +42,34 @@ export type Database = {
         Row: {
           category: string
           created_at: string | null
+          has_rfid_tag: boolean
           id: string
           item_code: string
           particulars: string | null
           size: string | null
-          tag_id: string
+          tag_id: string | null
           weight: string | null
         }
         Insert: {
           category: string
           created_at?: string | null
+          has_rfid_tag?: boolean
           id?: string
           item_code: string
           particulars?: string | null
           size?: string | null
-          tag_id: string
+          tag_id?: string | null
           weight?: string | null
         }
         Update: {
           category?: string
           created_at?: string | null
+          has_rfid_tag?: boolean
           id?: string
           item_code?: string
           particulars?: string | null
           size?: string | null
-          tag_id?: string
+          tag_id?: string | null
           weight?: string | null
         }
         Relationships: []
