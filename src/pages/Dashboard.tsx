@@ -61,22 +61,6 @@ const Dashboard = () => {
       setLastSyncTime(savedSyncTime);
     }
 
-    let statsInterval: NodeJS.Timeout | null = null;
-
-    const startStatsPolling = () => {
-      console.log('✓ Starting stats polling (every 2 seconds)...');
-      fetchStats();
-      statsInterval = setInterval(fetchStats, 2000);
-    };
-
-    const stopStatsPolling = () => {
-      if (statsInterval) {
-        console.log('✓ Stopping stats polling...');
-        clearInterval(statsInterval);
-        statsInterval = null;
-      }
-    };
-
     // Check if sync is needed
     const lastSyncDate = localStorage.getItem('lastInventorySync');
     const today = new Date().toDateString();
@@ -87,10 +71,7 @@ const Dashboard = () => {
     console.log(`Sync needed: ${lastSyncDate !== today}`);
     
     if (lastSyncDate !== today) {
-      console.log('→ Will run auto-sync...');
-      
-      // Stop any existing polling and show loading
-      stopStatsPolling();
+      console.log('→ Will run auto-sync on first load...');
       setIsSyncing(true);
       
       autoSyncInventory()
@@ -111,14 +92,17 @@ const Dashboard = () => {
         })
         .finally(() => {
           setIsSyncing(false);
-          startStatsPolling();
+          // Fetch stats once after sync completes
+          console.log('→ Fetching stats after sync...');
+          fetchStats();
         });
     } else {
-      console.log('→ Already synced today, skipping auto-sync');
-      startStatsPolling();
+      console.log('→ Already synced today, loading existing data');
+      // Fetch stats once on initial load
+      fetchStats();
     }
 
-    // Subscribe to real-time scan updates
+    // Subscribe to real-time scan updates only (no polling)
     const channel = supabase
       .channel('scan-updates')
       .on(
@@ -136,9 +120,6 @@ const Dashboard = () => {
       .subscribe();
 
     return () => {
-      if (statsInterval) {
-        clearInterval(statsInterval);
-      }
       supabase.removeChannel(channel);
     };
   }, []);
