@@ -13,31 +13,47 @@ export interface APIResponse {
 }
 
 export const fetchInventoryFromAPI = async (): Promise<InventoryItem[]> => {
-  console.log('Fetching from CK Inventory API...');
-  const apiUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
+  console.log('=== FETCHING FROM CK INVENTORY API (WITH PAGINATION) ===');
+  const baseUrl = "https://eucxuuepfsrbgktlqyqx.supabase.co/functions/v1/rfid-export";
   
-  // Try with limit parameter to get all items
-  const urlWithLimit = `${apiUrl}?limit=10000`;
+  const allItems: InventoryItem[] = [];
+  let offset = 0;
+  const limit = 1000; // Fetch in batches of 1000
+  let hasMore = true;
   
-  console.log(`API URL: ${urlWithLimit}`);
-  const response = await fetch(urlWithLimit);
-  
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+  while (hasMore) {
+    const url = `${baseUrl}?limit=${limit}&offset=${offset}`;
+    console.log(`Fetching batch: offset=${offset}, limit=${limit}`);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    const batchItems = result.data || [];
+    
+    console.log(`  ✓ Received ${batchItems.length} items in this batch`);
+    
+    if (batchItems.length === 0) {
+      hasMore = false;
+      console.log('  → No more items, pagination complete');
+    } else {
+      allItems.push(...batchItems);
+      offset += limit;
+      
+      // If we got fewer items than the limit, we've reached the end
+      if (batchItems.length < limit) {
+        hasMore = false;
+        console.log(`  → Last batch (${batchItems.length} < ${limit}), pagination complete`);
+      } else {
+        console.log(`  → More items available, continuing... (total so far: ${allItems.length})`);
+      }
+    }
   }
   
-  const result = await response.json();
-  console.log('API Response structure:', {
-    hasData: !!result.data,
-    dataLength: result.data?.length,
-    hasCount: !!result.count,
-    count: result.count,
-    allKeys: Object.keys(result)
-  });
+  console.log(`=== PAGINATION COMPLETE: ${allItems.length} total items fetched ===`);
   
-  // CRITICAL: Use result.data directly
-  const items = result.data || [];
-  console.log(`✓ API returned ${items.length} items (count field: ${result.count || 'N/A'})`);
-  
-  return items;
+  return allItems;
 };

@@ -53,9 +53,22 @@ const Dashboard = () => {
       return;
     }
 
-    // Auto-sync inventory on every app startup (removed daily limit for debugging)
-    console.log('Running auto-sync on startup...');
-    autoSyncInventory();
+    // Auto-sync inventory only once per day to avoid constant re-imports
+    const lastSyncDate = localStorage.getItem('lastInventorySync');
+    const today = new Date().toDateString();
+    
+    if (lastSyncDate !== today) {
+      console.log('=== STARTING DAILY AUTO-SYNC ===');
+      console.log(`Last sync: ${lastSyncDate || 'never'}`);
+      autoSyncInventory().then(() => {
+        localStorage.setItem('lastInventorySync', today);
+        console.log('=== AUTO-SYNC COMPLETE - Next sync tomorrow ===');
+      }).catch((error) => {
+        console.error('=== AUTO-SYNC FAILED ===', error);
+      });
+    } else {
+      console.log(`✓ Already synced today (${today}), skipping auto-sync`);
+    }
 
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
