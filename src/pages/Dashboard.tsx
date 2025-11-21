@@ -53,8 +53,18 @@ const Dashboard = () => {
       return;
     }
 
-    // Auto-sync inventory on startup
-    autoSyncInventory();
+    // Auto-sync inventory on startup - only if not already synced today
+    const lastSyncDate = localStorage.getItem('lastInventorySync');
+    const today = new Date().toDateString();
+    
+    if (lastSyncDate !== today) {
+      console.log('Running auto-sync (last sync was:', lastSyncDate || 'never', ')');
+      autoSyncInventory().then(() => {
+        localStorage.setItem('lastInventorySync', today);
+      });
+    } else {
+      console.log('Skipping auto-sync (already synced today)');
+    }
 
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
