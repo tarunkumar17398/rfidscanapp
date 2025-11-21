@@ -13,6 +13,9 @@ export const api = {
 
   // Dashboard stats - OPTIMIZED for fast performance
   getStats: async () => {
+    const timestamp = new Date().toISOString();
+    console.log(`[getStats ${timestamp}] Starting stats fetch...`);
+    
     try {
       // Get most recent cycle
       const { data: cycles, error: cycleError } = await supabase
@@ -26,6 +29,8 @@ export const api = {
       const cycle = cycles?.[0] || null;
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
 
+      console.log('[getStats] Fetching inventory with limit 10000...');
+      
       // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
       const [inventoryResult, scansResult] = await Promise.all([
         // Get all inventory items (both with and without RFID tags)
@@ -45,7 +50,7 @@ export const api = {
       if (inventoryResult.error) throw inventoryResult.error;
       if (scansResult.error) throw scansResult.error;
 
-      console.log(`[getStats] Fetched ${inventoryResult.data?.length || 0} inventory items from database`);
+      console.log(`[getStats] ✓ Fetched ${inventoryResult.data?.length || 0} inventory items from database`);
 
       // Build maps for fast lookups - separate with/without RFID
       const inventoryByCategory = new Map<string, { withRfid: Set<string>, withoutRfid: number }>();
@@ -90,7 +95,7 @@ export const api = {
         };
       });
 
-      console.log('[getStats] Calculated stats:', stats);
+      console.log('[getStats] ✓ Calculated stats:', stats.map(s => `${s.category}: ${s.total} items`).join(', '));
 
       return {
         stats,
