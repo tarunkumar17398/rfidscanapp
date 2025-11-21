@@ -95,13 +95,31 @@ const Dashboard = () => {
         'Tanjore Paintings': [],
       };
 
+      console.log('Sample items to check codes:', items.slice(0, 5).map(i => ({ code: i['ITEM CODE'], particulars: i['PARTICULARS'] })));
+
       items.forEach(item => {
-        const code = item['ITEM CODE'].substring(0, 2).toUpperCase();
-        console.log('Processing item:', item['ITEM CODE'], 'Code:', code);
+        const itemCode = item['ITEM CODE'];
+        if (!itemCode) {
+          console.warn('Item without code:', item);
+          return;
+        }
+        
+        const code = itemCode.substring(0, 2).toUpperCase();
+        
+        // Try to match with category codes
+        let matched = false;
         for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
           if (code === prefix) {
             itemsByCategory[category].push(item);
+            matched = true;
             break;
+          }
+        }
+        
+        if (!matched) {
+          // Log unmatched items to help debug
+          if (itemsByCategory['Brass'].length === 0) {
+            console.log('Unmatched item code:', code, 'from', itemCode);
           }
         }
       });
@@ -110,7 +128,8 @@ const Dashboard = () => {
         Brass: itemsByCategory['Brass'].length,
         Iron: itemsByCategory['Iron'].length,
         Wood: itemsByCategory['Wood'].length,
-        'Tanjore Paintings': itemsByCategory['Tanjore Paintings'].length
+        'Tanjore Paintings': itemsByCategory['Tanjore Paintings'].length,
+        Total: items.length
       });
 
       // Insert items into database for each category
