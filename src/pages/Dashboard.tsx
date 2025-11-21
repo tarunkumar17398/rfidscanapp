@@ -87,7 +87,7 @@ const Dashboard = () => {
       console.log('Auto-syncing inventory from CK Inventory API...');
       const items = await fetchInventoryFromAPI();
       
-      // Group items by category based on ITEM CODE prefix
+      // Group items by category based on ITEM CODE prefix (characters 2-4, after "CK")
       const itemsByCategory: Record<string, InventoryItem[]> = {
         'Brass': [],
         'Iron': [],
@@ -95,31 +95,21 @@ const Dashboard = () => {
         'Tanjore Paintings': [],
       };
 
-      console.log('Sample items to check codes:', items.slice(0, 5).map(i => ({ code: i['ITEM CODE'], particulars: i['PARTICULARS'] })));
-
       items.forEach(item => {
         const itemCode = item['ITEM CODE'];
-        if (!itemCode) {
-          console.warn('Item without code:', item);
+        if (!itemCode || itemCode.length < 4) {
+          console.warn('Item with invalid code:', item);
           return;
         }
         
-        const code = itemCode.substring(0, 2).toUpperCase();
+        // Extract the category code (characters 2-4, after "CK")
+        const code = itemCode.substring(2, 4).toUpperCase();
         
-        // Try to match with category codes
-        let matched = false;
+        // Match with category codes
         for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
           if (code === prefix) {
             itemsByCategory[category].push(item);
-            matched = true;
             break;
-          }
-        }
-        
-        if (!matched) {
-          // Log unmatched items to help debug
-          if (itemsByCategory['Brass'].length === 0) {
-            console.log('Unmatched item code:', code, 'from', itemCode);
           }
         }
       });
