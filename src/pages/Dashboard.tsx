@@ -27,6 +27,8 @@ const CATEGORY_CODES: Record<string, string> = {
 interface CategoryStats {
   category: string;
   total: number;
+  totalWithRfid: number;
+  totalWithoutRfid: number;
   scanned: number;
   missing: number;
 }
@@ -278,7 +280,9 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-primary tabular-nums">{animatedTotalItems}</p>
-              <p className="text-xs text-muted-foreground mt-1">With RFID tags</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.reduce((sum, s) => sum + s.totalWithRfid, 0)} with RFID • {stats.reduce((sum, s) => sum + s.totalWithoutRfid, 0)} without
+              </p>
             </CardContent>
           </Card>
           <Card className="border-secondary">
@@ -296,7 +300,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-destructive tabular-nums">{animatedTotalMissing}</p>
-              <p className="text-xs text-muted-foreground mt-1">Not yet scanned</p>
+              <p className="text-xs text-muted-foreground mt-1">With RFID, not scanned</p>
             </CardContent>
           </Card>
         </div>
@@ -329,6 +333,8 @@ const Dashboard = () => {
                     <TableRow>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">With RFID</TableHead>
+                      <TableHead className="text-right">Without RFID</TableHead>
                       <TableHead className="text-right">Scanned</TableHead>
                       <TableHead className="text-right">Missing</TableHead>
                     </TableRow>
@@ -337,7 +343,9 @@ const Dashboard = () => {
                     {stats.map((stat) => (
                       <TableRow key={stat.category}>
                         <TableCell className="font-medium">{stat.category}</TableCell>
-                        <AnimatedTableCell value={stat.total} />
+                        <AnimatedTableCell value={stat.total} className="font-semibold" />
+                        <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
+                        <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
                         <AnimatedTableCell value={stat.scanned} className="text-secondary font-semibold" />
                         <AnimatedTableCell value={stat.missing} className="text-destructive font-semibold" />
                       </TableRow>
@@ -418,6 +426,14 @@ const Dashboard = () => {
                     <span>Total:</span>
                     <span className="font-bold">{stat.total}</span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">With RFID:</span>
+                    <span className="font-semibold text-primary">{stat.totalWithRfid}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Without RFID:</span>
+                    <span className="font-semibold text-muted-foreground">{stat.totalWithoutRfid}</span>
+                  </div>
                   <div className="flex justify-between">
                     <span>Scanned:</span>
                     <span className="font-bold text-secondary">{stat.scanned}</span>
@@ -429,7 +445,7 @@ const Dashboard = () => {
                   <div className="w-full bg-muted rounded-full h-2 mt-2">
                     <div 
                       className="bg-secondary h-2 rounded-full transition-all"
-                      style={{ width: `${stat.total > 0 ? (stat.scanned / stat.total * 100) : 0}%` }}
+                      style={{ width: `${stat.totalWithRfid > 0 ? (stat.scanned / stat.totalWithRfid * 100) : 0}%` }}
                     />
                   </div>
                 </div>

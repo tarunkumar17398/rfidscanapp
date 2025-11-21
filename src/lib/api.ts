@@ -28,11 +28,10 @@ export const api = {
 
       // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
       const [inventoryResult, scansResult] = await Promise.all([
-        // Get all inventory items with RFID tags in one query
+        // Get all inventory items (both with and without RFID tags)
         supabase
           .from('inventory')
-          .select('tag_id, category, has_rfid_tag')
-          .eq('has_rfid_tag', true),
+          .select('tag_id, category, has_rfid_tag'),
         
         // Get all scans for current cycle in one query (if cycle exists)
         cycle ? supabase
@@ -44,14 +43,20 @@ export const api = {
       if (inventoryResult.error) throw inventoryResult.error;
       if (scansResult.error) throw scansResult.error;
 
-      // Build maps for fast lookups
-      const inventoryByCategory = new Map<string, Set<string>>();
+      // Build maps for fast lookups - separate with/without RFID
+      const inventoryByCategory = new Map<string, { withRfid: Set<string>, withoutRfid: number }>();
       
       for (const item of inventoryResult.data || []) {
         if (!inventoryByCategory.has(item.category)) {
-          inventoryByCategory.set(item.category, new Set());
+          inventoryByCategory.set(item.category, { withRfid: new Set(), withoutRfid: 0 });
         }
-        inventoryByCategory.get(item.category)!.add(item.tag_id);
+        const cat = inventoryByCategory.get(item.category)!;
+        
+        if (item.has_rfid_tag && item.tag_id) {
+          cat.withRfid.add(item.tag_id);
+        } else {
+          cat.withoutRfid++;
+        }
       }
 
       // Build set of scanned tags for fast lookup
@@ -59,12 +64,13 @@ export const api = {
 
       // Calculate stats for each category
       const stats = categories.map(category => {
-        const categoryTags = inventoryByCategory.get(category) || new Set();
-        const total = categoryTags.size;
+        const categoryData = inventoryByCategory.get(category) || { withRfid: new Set(), withoutRfid: 0 };
+        const totalWithRfid = categoryData.withRfid.size;
+        const totalWithoutRfid = categoryData.withoutRfid;
         
         // Count how many of this category's tags have been scanned
         let scanned = 0;
-        for (const tagId of categoryTags) {
+        for (const tagId of categoryData.withRfid) {
           if (scannedTags.has(tagId)) {
             scanned++;
           }
@@ -72,9 +78,11 @@ export const api = {
 
         return {
           category,
-          total,
+          total: totalWithRfid + totalWithoutRfid,
+          totalWithRfid,
+          totalWithoutRfid,
           scanned,
-          missing: total - scanned
+          missing: totalWithRfid - scanned
         };
       });
 
