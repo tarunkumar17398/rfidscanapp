@@ -5,12 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { fetchInventoryFromAPI, InventoryItem } from '@/services/inventoryApi';
+import { ArrowLeft, Upload, Cloud } from 'lucide-react';
 
 const CATEGORIES = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
 
+const CATEGORY_CODES: Record<string, string> = {
+  'Brass': 'BR',
+  'Iron': 'IR',
+  'Wood': 'WD',
+  'Tanjore Paintings': 'TP',
+};
+
 const ImportInventory = () => {
   const [uploading, setUploading] = useState<string | null>(null);
+  const [fetchingAPI, setFetchingAPI] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -39,6 +50,75 @@ const ImportInventory = () => {
     }
   };
 
+  const handleFetchFromAPI = async () => {
+    setFetchingAPI(true);
+    try {
+      const items = await fetchInventoryFromAPI();
+      
+      // Group items by category based on ITEM CODE prefix
+      const itemsByCategory: Record<string, InventoryItem[]> = {
+        'Brass': [],
+        'Iron': [],
+        'Wood': [],
+        'Tanjore Paintings': [],
+      };
+
+      items.forEach(item => {
+        const code = item['ITEM CODE'].substring(0, 2).toUpperCase();
+        for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
+          if (code === prefix) {
+            itemsByCategory[category].push(item);
+            break;
+          }
+        }
+      });
+
+      // Insert items into database for each category
+      let totalInserted = 0;
+      for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+        if (categoryItems.length === 0) continue;
+
+        // Clear existing items for this category
+        await supabase
+          .from('inventory')
+          .delete()
+          .eq('category', category);
+
+        // Insert new items
+        const inventoryData = categoryItems.map(item => ({
+          category,
+          item_code: item['ITEM CODE'],
+          particulars: item['PARTICULARS'],
+          size: item['SIZE'],
+          weight: item['Weight'],
+          tag_id: item['RFID-EPC'],
+        }));
+
+        const { error } = await supabase
+          .from('inventory')
+          .insert(inventoryData);
+
+        if (error) throw error;
+        totalInserted += categoryItems.length;
+      }
+
+      setLastSyncTime(new Date());
+      toast({
+        title: 'Success',
+        description: `Fetched ${totalInserted} items from CK Inventory`,
+      });
+    } catch (error: any) {
+      console.error('API fetch error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch from API. Please use CSV import instead.',
+        variant: 'destructive',
+      });
+    } finally {
+      setFetchingAPI(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
@@ -48,6 +128,33 @@ const ImportInventory = () => {
           </Button>
           <h1 className="text-xl sm:text-3xl font-bold">Import Inventory</h1>
         </div>
+
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <Cloud className="h-5 w-5" />
+              Fetch from CK Inventory
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Import all in-stock items directly from the CK Inventory system
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0 space-y-3">
+            <Button 
+              onClick={handleFetchFromAPI} 
+              disabled={fetchingAPI}
+              className="w-full sm:w-auto"
+              size="sm"
+            >
+              {fetchingAPI ? "Fetching..." : "Fetch from CK Inventory"}
+            </Button>
+            {lastSyncTime && (
+              <p className="text-xs text-muted-foreground">
+                Last synced: {lastSyncTime.toLocaleString()}
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {CATEGORIES.map((category) => (
