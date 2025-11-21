@@ -28,10 +28,11 @@ export const api = {
 
       // OPTIMIZATION: Fetch ALL data in parallel with just 2 queries
       const [inventoryResult, scansResult] = await Promise.all([
-        // Get all inventory items in one query
+        // Get all inventory items with RFID tags in one query
         supabase
           .from('inventory')
-          .select('tag_id, category'),
+          .select('tag_id, category, has_rfid_tag')
+          .eq('has_rfid_tag', true),
         
         // Get all scans for current cycle in one query (if cycle exists)
         cycle ? supabase
@@ -104,10 +105,19 @@ export const api = {
       // Delete existing items in this category
       await supabase.from('inventory').delete().eq('category', category);
 
-      // Parse and insert new items
+      // Parse and insert new items with has_rfid_tag flag
       const items = dataLines.map(line => {
         const [item_code, particulars, size, weight, tag_id] = line.split(',').map(s => s.trim());
-        return { item_code, particulars, size, weight, tag_id, category };
+        const hasRfid = tag_id && tag_id !== '';
+        return { 
+          item_code, 
+          particulars, 
+          size, 
+          weight, 
+          tag_id: hasRfid ? tag_id : null, 
+          has_rfid_tag: hasRfid,
+          category 
+        };
       });
 
       const { error } = await supabase.from('inventory').insert(items);

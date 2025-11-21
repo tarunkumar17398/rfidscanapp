@@ -84,15 +84,19 @@ const ImportInventory = () => {
           .delete()
           .eq('category', category);
 
-        // Insert new items
-        const inventoryData = categoryItems.map(item => ({
-          category,
-          item_code: item['ITEM CODE'],
-          particulars: item['PARTICULARS'],
-          size: item['SIZE'],
-          weight: item['Weight'],
-          tag_id: item['RFID-EPC'],
-        }));
+        // Insert new items with has_rfid_tag flag
+        const inventoryData = categoryItems.map(item => {
+          const hasRfid = item['RFID-EPC'] && item['RFID-EPC'].trim() !== '';
+          return {
+            category,
+            item_code: item['ITEM CODE'],
+            particulars: item['PARTICULARS'],
+            size: item['SIZE'],
+            weight: item['Weight'],
+            tag_id: hasRfid ? item['RFID-EPC'] : null,
+            has_rfid_tag: hasRfid,
+          };
+        });
 
         const { error } = await supabase
           .from('inventory')
@@ -102,10 +106,14 @@ const ImportInventory = () => {
         totalInserted += categoryItems.length;
       }
 
+      // Count items with and without RFID tags
+      const itemsWithRfid = items.filter(item => item['RFID-EPC'] && item['RFID-EPC'].trim() !== '').length;
+      const itemsWithoutRfid = items.length - itemsWithRfid;
+
       setLastSyncTime(new Date());
       toast({
         title: 'Success',
-        description: `Fetched ${totalInserted} items from CK Inventory`,
+        description: `Fetched ${totalInserted} items (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`,
       });
     } catch (error: any) {
       console.error('API fetch error:', error);

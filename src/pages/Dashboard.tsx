@@ -114,15 +114,19 @@ const Dashboard = () => {
           .delete()
           .eq('category', category);
 
-        // Insert new items
-        const inventoryData = categoryItems.map(item => ({
-          category,
-          item_code: item['ITEM CODE'],
-          particulars: item['PARTICULARS'],
-          size: item['SIZE'],
-          weight: item['Weight'],
-          tag_id: item['RFID-EPC'],
-        }));
+        // Insert new items with has_rfid_tag flag
+        const inventoryData = categoryItems.map(item => {
+          const hasRfid = item['RFID-EPC'] && item['RFID-EPC'].trim() !== '';
+          return {
+            category,
+            item_code: item['ITEM CODE'],
+            particulars: item['PARTICULARS'],
+            size: item['SIZE'],
+            weight: item['Weight'],
+            tag_id: hasRfid ? item['RFID-EPC'] : null,
+            has_rfid_tag: hasRfid,
+          };
+        });
 
         const { error } = await supabase
           .from('inventory')
@@ -132,10 +136,14 @@ const Dashboard = () => {
         totalInserted += categoryItems.length;
       }
 
-      console.log(`Auto-sync complete: ${totalInserted} items synced`);
+      // Count items with and without RFID tags
+      const itemsWithRfid = items.filter(item => item['RFID-EPC'] && item['RFID-EPC'].trim() !== '').length;
+      const itemsWithoutRfid = items.length - itemsWithRfid;
+
+      console.log(`Auto-sync complete: ${totalInserted} items synced (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`);
       toast({
         title: 'Inventory Synced',
-        description: `${totalInserted} items loaded from CK Inventory`,
+        description: `${totalInserted} items loaded (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`,
       });
     } catch (error: any) {
       console.error('Auto-sync failed:', error);
@@ -270,6 +278,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-primary tabular-nums">{animatedTotalItems}</p>
+              <p className="text-xs text-muted-foreground mt-1">With RFID tags</p>
             </CardContent>
           </Card>
           <Card className="border-secondary">
@@ -278,6 +287,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">{animatedTotalScanned}</p>
+              <p className="text-xs text-muted-foreground mt-1">RFID tags found</p>
             </CardContent>
           </Card>
           <Card className="border-destructive">
@@ -286,6 +296,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <p className="text-2xl sm:text-4xl font-bold text-destructive tabular-nums">{animatedTotalMissing}</p>
+              <p className="text-xs text-muted-foreground mt-1">Not yet scanned</p>
             </CardContent>
           </Card>
         </div>
