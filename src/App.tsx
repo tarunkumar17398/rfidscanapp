@@ -16,11 +16,11 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <ScannerProvider>
-        <Toaster />
-        <Sonner />
+    <ScannerProvider>
+      <TooltipProvider>
         <BrowserRouter basename={import.meta.env.PROD ? "/rfidscanapp" : ""}>
+          <Toaster />
+          <Sonner />
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
@@ -31,8 +31,8 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
-      </ScannerProvider>
-    </TooltipProvider>
+      </TooltipProvider>
+    </ScannerProvider>
   </QueryClientProvider>
 );
 
