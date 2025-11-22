@@ -13,9 +13,6 @@ export const api = {
 
   // Dashboard stats - OPTIMIZED for fast performance
   getStats: async () => {
-    const timestamp = new Date().toISOString();
-    console.log(`[getStats ${timestamp}] Starting stats fetch...`);
-    
     try {
       // Get most recent cycle
       const { data: cycles, error: cycleError } = await supabase
@@ -28,8 +25,6 @@ export const api = {
 
       const cycle = cycles?.[0] || null;
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
-
-      console.log('[getStats] Fetching ALL inventory items...');
       
       // Fetch ALL inventory items in batches if needed
       let allInventory: any[] = [];
@@ -56,8 +51,6 @@ export const api = {
           hasMore = false;
         }
       }
-      
-      console.log(`[getStats] ✓ Fetched ${allInventory.length} inventory items from database`);
       
       // Get all scans for current cycle
       const scansResult = cycle ? await supabase
@@ -109,8 +102,6 @@ export const api = {
           missing: totalWithRfid - scanned
         };
       });
-
-      console.log('[getStats] ✓ Calculated stats:', stats.map(s => `${s.category}: ${s.total} items`).join(', '));
 
       return {
         stats,
@@ -168,8 +159,6 @@ export const api = {
   // Cycle management
   startCycle: async () => {
     try {
-      console.log('Starting new cycle...');
-      
       // Close any active cycles
       const { error: updateError } = await supabase
         .from('cycles')
@@ -193,7 +182,6 @@ export const api = {
         throw insertError;
       }
 
-      console.log('New cycle created:', data);
       return { success: true, message: 'New cycle started' };
     } catch (error) {
       console.error('Error starting cycle:', error);
@@ -431,9 +419,6 @@ export const api = {
 
   // Scan endpoint (called by RFID scanner)
   scan: async (tagId: string) => {
-    console.log('=== API SCAN REQUEST ===');
-    console.log('Sending tagId to backend:', tagId);
-    
     try {
       // Get current active cycle
       const { data: cycles } = await supabase
@@ -484,9 +469,6 @@ export const api = {
         });
 
       if (scanError) throw scanError;
-
-      console.log('Scan recorded successfully');
-      console.log('======================');
 
       return {
         success: true,
