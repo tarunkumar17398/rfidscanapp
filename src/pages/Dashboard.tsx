@@ -8,7 +8,6 @@ import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ScannerStatus } from '@/components/ScannerStatus';
-import { DebugConsole } from '@/components/DebugConsole';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
@@ -650,8 +649,6 @@ const Dashboard = () => {
           Export CSV Report
         </Button>
       </div>
-      
-      <DebugConsole />
     </div>
   );
 };
