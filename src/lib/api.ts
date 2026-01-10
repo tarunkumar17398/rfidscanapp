@@ -52,13 +52,33 @@ export const api = {
         }
       }
       
-      // Get all scans for current cycle
-      const scansResult = cycle ? await supabase
-        .from('scans')
-        .select('tag_id')
-        .gte('scanned_at', cycle.started_at) : { data: [], error: null };
-
-      if (scansResult.error) throw scansResult.error;
+      // Get all scans for current cycle (paginate to handle >1000)
+      let allScans: { tag_id: string }[] = [];
+      if (cycle) {
+        let scanFrom = 0;
+        let hasMoreScans = true;
+        
+        while (hasMoreScans) {
+          const { data: scanBatch, error: scanError } = await supabase
+            .from('scans')
+            .select('tag_id')
+            .gte('scanned_at', cycle.started_at)
+            .range(scanFrom, scanFrom + batchSize - 1);
+          
+          if (scanError) throw scanError;
+          
+          if (scanBatch && scanBatch.length > 0) {
+            allScans = allScans.concat(scanBatch);
+            scanFrom += batchSize;
+            
+            if (scanBatch.length < batchSize) {
+              hasMoreScans = false;
+            }
+          } else {
+            hasMoreScans = false;
+          }
+        }
+      }
 
       // Build maps for fast lookups - separate with/without RFID
       const inventoryByCategory = new Map<string, { withRfid: Set<string>, withoutRfid: number }>();
@@ -77,7 +97,7 @@ export const api = {
       }
 
       // Build set of scanned tags for fast lookup
-      const scannedTags = new Set(scansResult.data?.map(s => s.tag_id) || []);
+      const scannedTags = new Set(allScans.map(s => s.tag_id));
 
       // Calculate stats for each category
       const stats = categories.map(category => {
