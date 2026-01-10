@@ -281,43 +281,87 @@ export const api = {
       const categories = ['Brass', 'Iron', 'Wood', 'Tanjore Paintings'];
       const missing = [];
 
-      for (const category of categories) {
-        // Get all items in category - use range() for more than 1000 items
-        const { data: allItems, error: itemsError } = await supabase
-          .from('inventory')
-          .select('*')
-          .eq('category', category)
-          .range(0, 9999);
-
-        if (itemsError) throw itemsError;
-
-        if (!allItems || allItems.length === 0) continue;
-
-        // Get scanned tag_ids
-        let scannedTagIds: string[] = [];
-        if (cycle) {
+      // Fetch ALL scanned tags for current cycle (paginated)
+      let scannedTagIds: string[] = [];
+      if (cycle) {
+        let scanFrom = 0;
+        const batchSize = 1000;
+        let hasMoreScans = true;
+        
+        while (hasMoreScans) {
           const { data: scans, error: scansError } = await supabase
             .from('scans')
             .select('tag_id')
-            .gte('scanned_at', cycle.started_at);
+            .gte('scanned_at', cycle.started_at)
+            .range(scanFrom, scanFrom + batchSize - 1);
 
           if (scansError) throw scansError;
-          scannedTagIds = scans?.map(s => s.tag_id) || [];
+          
+          if (scans && scans.length > 0) {
+            scannedTagIds = scannedTagIds.concat(scans.map(s => s.tag_id));
+            scanFrom += batchSize;
+            if (scans.length < batchSize) hasMoreScans = false;
+          } else {
+            hasMoreScans = false;
+          }
+        }
+      }
+
+      const scannedTagSet = new Set(scannedTagIds);
+
+      for (const category of categories) {
+        // Get all items in category - paginated for large datasets
+        let allItems: any[] = [];
+        let itemFrom = 0;
+        const batchSize = 1000;
+        let hasMoreItems = true;
+        
+        while (hasMoreItems) {
+          const { data: itemBatch, error: itemsError } = await supabase
+            .from('inventory')
+            .select('*')
+            .eq('category', category)
+            .range(itemFrom, itemFrom + batchSize - 1);
+
+          if (itemsError) throw itemsError;
+          
+          if (itemBatch && itemBatch.length > 0) {
+            allItems = allItems.concat(itemBatch);
+            itemFrom += batchSize;
+            if (itemBatch.length < batchSize) hasMoreItems = false;
+          } else {
+            hasMoreItems = false;
+          }
         }
 
-        // Find missing items
-        const missingItems = allItems.filter(item => !scannedTagIds.includes(item.tag_id));
+        if (!allItems || allItems.length === 0) continue;
 
-        if (missingItems.length > 0) {
+        // Separate items with and without RFID tags
+        const itemsWithRfid = allItems.filter(item => item.has_rfid_tag && item.tag_id);
+        const itemsWithoutRfid = allItems.filter(item => !item.has_rfid_tag || !item.tag_id);
+
+        // Find missing items (only from those with RFID tags)
+        const missingWithRfid = itemsWithRfid.filter(item => !scannedTagSet.has(item.tag_id));
+
+        if (missingWithRfid.length > 0 || itemsWithoutRfid.length > 0) {
           missing.push({
             category,
-            count: missingItems.length,
-            items: missingItems.map(item => ({
+            count: missingWithRfid.length + itemsWithoutRfid.length,
+            countWithRfid: missingWithRfid.length,
+            countWithoutRfid: itemsWithoutRfid.length,
+            itemsWithRfid: missingWithRfid.map(item => ({
               itemCode: item.item_code,
               particulars: item.particulars,
               size: item.size,
               weight: item.weight,
               tagId: item.tag_id
+            })),
+            itemsWithoutRfid: itemsWithoutRfid.map(item => ({
+              itemCode: item.item_code,
+              particulars: item.particulars,
+              size: item.size,
+              weight: item.weight,
+              tagId: null
             }))
           });
         }
