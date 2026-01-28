@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,7 +101,10 @@ const Dashboard = () => {
       fetchStats();
     }
 
-    // Subscribe to real-time scan updates only (no polling)
+    // Debounce timer for realtime updates
+    let debounceTimer: NodeJS.Timeout | null = null;
+    
+    // Subscribe to real-time scan updates with debounce to prevent server overload
     const channel = supabase
       .channel('scan-updates')
       .on(
@@ -112,13 +115,22 @@ const Dashboard = () => {
           table: 'scans'
         },
         () => {
-          console.log('New scan detected, refreshing stats...');
-          fetchStats();
+          // Debounce: wait 500ms after last scan before refreshing
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
+          }
+          debounceTimer = setTimeout(() => {
+            console.log('Scans detected, refreshing stats...');
+            fetchStats();
+          }, 500);
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
       supabase.removeChannel(channel);
     };
   }, []);
