@@ -224,6 +224,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const clearScanAttempts = () => {
     setScanAttempts([]);
     setTotalScans(0);
+    totalScansRef.current = 0;
     setScanRate(0);
     lastMilestoneRef.current = 0;
     scanCountInLastSecondRef.current = [];
