@@ -73,7 +73,7 @@ export class RFIDScanner {
   private onBatteryUpdate: ((percentage: number) => void) | null = null;
   private batteryCheckInterval: number | null = null;
 
-  setOnTagScanned(callback: (tagId: string) => void) {
+  setOnTagScanned(callback: (data: TagReadData) => void) {
     this.onTagScanned = callback;
   }
 
