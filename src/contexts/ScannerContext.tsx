@@ -42,6 +42,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
+  const totalScansRef = useRef(0);
   const [scanRate, setScanRate] = useState(0);
   const [pulseTrigger, setPulseTrigger] = useState(0);
   const [sessionMode, setSessionModeState] = useState<SessionMode>('S1');
