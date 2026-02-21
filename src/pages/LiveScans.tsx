@@ -92,12 +92,18 @@ const LiveScans = () => {
                         <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm">{attempt.time}</td>
                         <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm break-all">{attempt.tagId}</td>
                         <td className="p-2 sm:p-3">
-                          {attempt.success ? (
+                          <span className={`inline-flex items-center gap-1 text-xs tabular-nums ${
+                            attempt.rssi > -50 ? 'text-secondary' : attempt.rssi > -70 ? 'text-accent-foreground' : 'text-muted-foreground'
+                          }`}>
+                            <Radio className="h-3 w-3" />
+                            {attempt.rssi}
+                          </span>
+                        </td>
+                        <td className="p-2 sm:p-3">
+                          {!attempt.duplicate ? (
                             <Badge variant="default" className="text-[10px] sm:text-xs">New</Badge>
-                          ) : attempt.duplicate ? (
-                            <Badge variant="secondary" className="text-[10px] sm:text-xs">Duplicate</Badge>
                           ) : (
-                            <Badge variant="destructive" className="text-[10px] sm:text-xs">Error</Badge>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs">Dup #{attempt.count}</Badge>
                           )}
                         </td>
                       </tr>
