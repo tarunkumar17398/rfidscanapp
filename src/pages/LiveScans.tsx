@@ -60,6 +60,9 @@ const LiveScans = () => {
           </div>
         </div>
 
+        {/* Scan Progress */}
+        <ScanProgress />
+
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">All Tag Reads ({scanAttempts.length})</CardTitle>
