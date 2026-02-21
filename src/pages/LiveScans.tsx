@@ -75,6 +75,7 @@ const LiveScans = () => {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Time</th>
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Tag ID</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">RSSI</th>
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Status</th>
                   </tr>
                 </thead>
