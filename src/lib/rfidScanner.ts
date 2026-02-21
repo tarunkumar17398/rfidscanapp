@@ -60,15 +60,20 @@ const createSessionCommand = (session: number): Uint8Array => {
 
 export type SessionMode = 'S0' | 'S1' | 'S2' | 'S3';
 
+export interface TagReadData {
+  tagId: string;
+  rssi: number;
+}
+
 export class RFIDScanner {
   private gattServer: BluetoothRemoteGATTServer | null = null;
   private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-  private onTagScanned: ((tagId: string) => void) | null = null;
+  private onTagScanned: ((data: TagReadData) => void) | null = null;
   private onStatusChange: ((status: string) => void) | null = null;
   private onBatteryUpdate: ((percentage: number) => void) | null = null;
   private batteryCheckInterval: number | null = null;
 
-  setOnTagScanned(callback: (tagId: string) => void) {
+  setOnTagScanned(callback: (data: TagReadData) => void) {
     this.onTagScanned = callback;
   }
 
@@ -256,6 +261,15 @@ export class RFIDScanner {
       return;
     }
     
+    // RSSI Extraction (byte 5 in Chafon H102 response)
+    let rssi = -100; // Default weak signal
+    if (value.byteLength > 5) {
+      // Chafon H102 stores RSSI as unsigned byte, convert to dBm (typically negative)
+      const rawRssi = value.getUint8(5);
+      rssi = rawRssi > 127 ? rawRssi - 256 : -rawRssi;
+      console.log('📶 RSSI:', rssi, 'dBm (raw:', rawRssi, ')');
+    }
+
     // EPC Data Extraction Logic
     const epcLength = value.getUint8(10);
     const epcStartIndex = 11;
@@ -273,10 +287,10 @@ export class RFIDScanner {
     }
     const rfidTag = hexArray.join('');
     
-    console.log('RFID Tag extracted:', rfidTag);
+    console.log('RFID Tag extracted:', rfidTag, 'RSSI:', rssi);
 
     if (this.onTagScanned) {
-      this.onTagScanned(rfidTag);
+      this.onTagScanned({ tagId: rfidTag, rssi });
     }
   }
 

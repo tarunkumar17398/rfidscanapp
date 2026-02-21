@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Radio } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { ScanProgress } from '@/components/ScanProgress';
 
 interface Scan {
   id: string; // Changed from number to string (UUID)
@@ -59,6 +60,9 @@ const LiveScans = () => {
           </div>
         </div>
 
+        {/* Scan Progress */}
+        <ScanProgress />
+
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">All Tag Reads ({scanAttempts.length})</CardTitle>
@@ -71,13 +75,14 @@ const LiveScans = () => {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Time</th>
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Tag ID</th>
+                    <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">RSSI</th>
                     <th className="text-left p-2 sm:p-3 font-semibold text-xs sm:text-sm">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scanAttempts.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
+                      <td colSpan={4} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
                         No scans yet. Start scanning to see live data.
                       </td>
                     </tr>
@@ -87,12 +92,18 @@ const LiveScans = () => {
                         <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm">{attempt.time}</td>
                         <td className="p-2 sm:p-3 font-mono text-xs sm:text-sm break-all">{attempt.tagId}</td>
                         <td className="p-2 sm:p-3">
-                          {attempt.success ? (
+                          <span className={`inline-flex items-center gap-1 text-xs tabular-nums ${
+                            attempt.rssi > -50 ? 'text-secondary' : attempt.rssi > -70 ? 'text-accent-foreground' : 'text-muted-foreground'
+                          }`}>
+                            <Radio className="h-3 w-3" />
+                            {attempt.rssi}
+                          </span>
+                        </td>
+                        <td className="p-2 sm:p-3">
+                          {!attempt.duplicate ? (
                             <Badge variant="default" className="text-[10px] sm:text-xs">New</Badge>
-                          ) : attempt.duplicate ? (
-                            <Badge variant="secondary" className="text-[10px] sm:text-xs">Duplicate</Badge>
                           ) : (
-                            <Badge variant="destructive" className="text-[10px] sm:text-xs">Error</Badge>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs">Dup #{attempt.count}</Badge>
                           )}
                         </td>
                       </tr>

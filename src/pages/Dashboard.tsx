@@ -6,6 +6,9 @@ import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw } from 'lucide-react';
+import { ScanProgress } from '@/components/ScanProgress';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ScannerStatus } from '@/components/ScannerStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -44,7 +47,7 @@ const Dashboard = () => {
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode } = useScanner();
+  const { scanning, scannerStatus, sessionMode, smartMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -552,6 +555,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Scan Progress (Zebra-inspired) */}
+        <ScanProgress />
+
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">Scanner Control</CardTitle>
@@ -562,6 +568,21 @@ const Dashboard = () => {
               <ScannerStatus />
             </div>
             
+            {/* Smart Mode Toggle */}
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm sm:text-base">Smart Mode</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  Auto-switches S1→S0 when discovery slows
+                </span>
+              </div>
+              <Switch
+                checked={smartMode}
+                onCheckedChange={setSmartMode}
+                disabled={scannerStatus === 'Not connected'}
+              />
+            </div>
+
             {/* Session Mode Selector */}
             <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
               <div className="flex flex-col">
@@ -576,7 +597,7 @@ const Dashboard = () => {
               <Select 
                 value={sessionMode} 
                 onValueChange={(value) => setSessionMode(value as SessionMode)}
-                disabled={scannerStatus === 'Not connected'}
+                disabled={scannerStatus === 'Not connected' || smartMode}
               >
                 <SelectTrigger className="w-20 sm:w-24">
                   <SelectValue />
