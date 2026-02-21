@@ -555,6 +555,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Scan Progress (Zebra-inspired) */}
+        <ScanProgress />
+
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">Scanner Control</CardTitle>
@@ -565,6 +568,21 @@ const Dashboard = () => {
               <ScannerStatus />
             </div>
             
+            {/* Smart Mode Toggle */}
+            <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
+              <div className="flex flex-col">
+                <span className="font-medium text-sm sm:text-base">Smart Mode</span>
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  Auto-switches S1→S0 when discovery slows
+                </span>
+              </div>
+              <Switch
+                checked={smartMode}
+                onCheckedChange={setSmartMode}
+                disabled={scannerStatus === 'Not connected'}
+              />
+            </div>
+
             {/* Session Mode Selector */}
             <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
               <div className="flex flex-col">
@@ -579,7 +597,7 @@ const Dashboard = () => {
               <Select 
                 value={sessionMode} 
                 onValueChange={(value) => setSessionMode(value as SessionMode)}
-                disabled={scannerStatus === 'Not connected'}
+                disabled={scannerStatus === 'Not connected' || smartMode}
               >
                 <SelectTrigger className="w-20 sm:w-24">
                   <SelectValue />
