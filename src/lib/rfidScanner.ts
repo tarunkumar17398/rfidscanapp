@@ -261,6 +261,15 @@ export class RFIDScanner {
       return;
     }
     
+    // RSSI Extraction (byte 5 in Chafon H102 response)
+    let rssi = -100; // Default weak signal
+    if (value.byteLength > 5) {
+      // Chafon H102 stores RSSI as unsigned byte, convert to dBm (typically negative)
+      const rawRssi = value.getUint8(5);
+      rssi = rawRssi > 127 ? rawRssi - 256 : -rawRssi;
+      console.log('📶 RSSI:', rssi, 'dBm (raw:', rawRssi, ')');
+    }
+
     // EPC Data Extraction Logic
     const epcLength = value.getUint8(10);
     const epcStartIndex = 11;
@@ -278,10 +287,10 @@ export class RFIDScanner {
     }
     const rfidTag = hexArray.join('');
     
-    console.log('RFID Tag extracted:', rfidTag);
+    console.log('RFID Tag extracted:', rfidTag, 'RSSI:', rssi);
 
     if (this.onTagScanned) {
-      this.onTagScanned(rfidTag);
+      this.onTagScanned({ tagId: rfidTag, rssi });
     }
   }
 
