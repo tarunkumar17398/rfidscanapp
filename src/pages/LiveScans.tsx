@@ -82,7 +82,7 @@ const LiveScans = () => {
                 <tbody>
                   {scanAttempts.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
+                      <td colSpan={4} className="text-center p-6 sm:p-8 text-muted-foreground text-sm">
                         No scans yet. Start scanning to see live data.
                       </td>
                     </tr>
