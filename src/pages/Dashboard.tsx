@@ -47,7 +47,7 @@ const Dashboard = () => {
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode } = useScanner();
+  const { scanning, scannerStatus, sessionMode, smartMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
