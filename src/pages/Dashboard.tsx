@@ -101,10 +101,11 @@ const Dashboard = () => {
       fetchStats();
     }
 
-    // Debounce timer for realtime updates
-    let debounceTimer: NodeJS.Timeout | null = null;
+    // Throttle for realtime updates (fires at most once every 2 seconds)
+    let lastFetchTime = 0;
+    let pendingFetch: NodeJS.Timeout | null = null;
     
-    // Subscribe to real-time scan updates with debounce to prevent server overload
+    // Subscribe to real-time scan updates with throttle to prevent server overload
     const channel = supabase
       .channel('scan-updates')
       .on(
@@ -115,21 +116,32 @@ const Dashboard = () => {
           table: 'scans'
         },
         () => {
-          // Debounce: wait 500ms after last scan before refreshing
-          if (debounceTimer) {
-            clearTimeout(debounceTimer);
-          }
-          debounceTimer = setTimeout(() => {
-            console.log('Scans detected, refreshing stats...');
+          const now = Date.now();
+          const timeSinceLastFetch = now - lastFetchTime;
+          
+          if (timeSinceLastFetch >= 2000) {
+            // Enough time has passed, fetch immediately
+            lastFetchTime = now;
+            console.log('Scans detected, refreshing stats (throttle: immediate)...');
             fetchStats();
-          }, 500);
+          } else if (!pendingFetch) {
+            // Schedule a fetch for when the throttle window expires
+            const delay = 2000 - timeSinceLastFetch;
+            pendingFetch = setTimeout(() => {
+              lastFetchTime = Date.now();
+              pendingFetch = null;
+              console.log('Scans detected, refreshing stats (throttle: delayed)...');
+              fetchStats();
+            }, delay);
+          }
+          // If pendingFetch already exists, skip - it will handle the update
         }
       )
       .subscribe();
 
     return () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
+      if (pendingFetch) {
+        clearTimeout(pendingFetch);
       }
       supabase.removeChannel(channel);
     };

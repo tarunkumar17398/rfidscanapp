@@ -42,6 +42,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
+  const totalScansRef = useRef(0);
   const [scanRate, setScanRate] = useState(0);
   const [pulseTrigger, setPulseTrigger] = useState(0);
   const [sessionMode, setSessionModeState] = useState<SessionMode>('S1');
@@ -63,11 +64,14 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     const batchInterval = setInterval(() => {
       if (scanBufferRef.length === 0) return;
 
+      // Copy buffer contents before clearing to prevent race condition
+      const batchCopy = [...scanBufferRef];
+      scanBufferRef.length = 0;
+
       const now = Date.now();
-      const timeSinceLastBatch = now - lastBatchTimeRef.current;
       
       // Calculate scan rate (tags per second)
-      const scansInBatch = scanBufferRef.length;
+      const scansInBatch = batchCopy.length;
       scanCountInLastSecondRef.current.push(scansInBatch);
       
       // Keep only last 2 seconds of data for rate calculation
@@ -82,8 +86,9 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       
       setScanRate(avgRate);
 
-      // Update total scan count
-      const newTotal = totalScans + scansInBatch;
+      // Update total scan count using ref to avoid dependency issues
+      totalScansRef.current += scansInBatch;
+      const newTotal = totalScansRef.current;
       setTotalScans(newTotal);
 
       // Check for milestones (10, 50, 100, 500, 1000, etc.)
@@ -106,7 +111,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
       // Add to scan attempts with counts (limit to last 100 for performance)
       setScanAttempts(prev => [
-        ...scanBufferRef.map(scan => {
+        ...batchCopy.map(scan => {
           const count = tagCountsRef.get(scan.tagId) || 1;
           const isDuplicate = count > 1;
           return {
@@ -121,36 +126,29 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       ].slice(0, 100));
 
       // Process scans to server using batch API (background, non-blocking)
+      const tagIds = batchCopy.map(scan => scan.tagId);
       (async () => {
-        if (scanBufferRef.length > 0) {
-          const tagIds = scanBufferRef.map(scan => scan.tagId);
-          
-          if (isOnline) {
-            try {
-              await api.batchScan(tagIds);
-            } catch (error) {
-              console.error('Batch scan failed, falling back to offline storage:', error);
-              // Fallback to offline storage
-              for (const tagId of tagIds) {
-                await syncManager.addPendingScan(tagId);
-              }
-            }
-          } else {
-            // Offline: store all for later sync
+        if (isOnline) {
+          try {
+            await api.batchScan(tagIds);
+          } catch (error) {
+            console.error('Batch scan failed, falling back to offline storage:', error);
             for (const tagId of tagIds) {
               await syncManager.addPendingScan(tagId);
             }
           }
+        } else {
+          for (const tagId of tagIds) {
+            await syncManager.addPendingScan(tagId);
+          }
         }
       })();
 
-      // Clear buffer
-      scanBufferRef.length = 0;
       lastBatchTimeRef.current = now;
     }, 500);
 
     return () => clearInterval(batchInterval);
-  }, [totalScans, isOnline, toast]);
+  }, [isOnline, toast]);
 
   // Reset scan rate when no scans for 2 seconds
   useEffect(() => {
@@ -226,6 +224,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const clearScanAttempts = () => {
     setScanAttempts([]);
     setTotalScans(0);
+    totalScansRef.current = 0;
     setScanRate(0);
     lastMilestoneRef.current = 0;
     scanCountInLastSecondRef.current = [];
