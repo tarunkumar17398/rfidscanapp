@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Radio } from 'lucide-react';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
+import { ScanProgress } from '@/components/ScanProgress';
 
 interface Scan {
   id: string; // Changed from number to string (UUID)
