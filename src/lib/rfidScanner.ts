@@ -60,10 +60,15 @@ const createSessionCommand = (session: number): Uint8Array => {
 
 export type SessionMode = 'S0' | 'S1' | 'S2' | 'S3';
 
+export interface TagReadData {
+  tagId: string;
+  rssi: number;
+}
+
 export class RFIDScanner {
   private gattServer: BluetoothRemoteGATTServer | null = null;
   private writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-  private onTagScanned: ((tagId: string) => void) | null = null;
+  private onTagScanned: ((data: TagReadData) => void) | null = null;
   private onStatusChange: ((status: string) => void) | null = null;
   private onBatteryUpdate: ((percentage: number) => void) | null = null;
   private batteryCheckInterval: number | null = null;
