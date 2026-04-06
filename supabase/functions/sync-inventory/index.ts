@@ -39,8 +39,9 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: Transform items
-    const allInventoryData = [];
+    const allInventoryData: any[] = [];
     const categoryCounts: Record<string, number> = {};
+    const seenTagIds = new Set<string>();
 
     for (const item of items) {
       const itemCode = item['ITEM CODE'];
@@ -52,64 +53,63 @@ Deno.serve(async (req) => {
 
       categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-      const hasRfid = Boolean(item['RFID-EPC']?.trim());
+      let hasRfid = Boolean(item['RFID-EPC']?.trim());
+      let tagId = hasRfid ? item['RFID-EPC'].trim() : null;
+      
+      // Deduplicate tag_ids
+      if (tagId && seenTagIds.has(tagId)) {
+        tagId = null;
+        hasRfid = false;
+      } else if (tagId) {
+        seenTagIds.add(tagId);
+      }
+
       allInventoryData.push({
         category,
         item_code: itemCode,
         particulars: item['PARTICULARS'] || null,
         size: item['SIZE'] || null,
         weight: item['Weight'] || null,
-        tag_id: hasRfid ? item['RFID-EPC'] : null,
+        tag_id: tagId,
         has_rfid_tag: hasRfid,
       });
     }
 
-    // Deduplicate tag_ids - if multiple items share a tag_id, only keep the first
-    const seenTagIds = new Set<string>();
-    for (const item of allInventoryData) {
-      if (item.tag_id) {
-        if (seenTagIds.has(item.tag_id)) {
-          item.tag_id = null;
-          item.has_rfid_tag = false;
-        } else {
-          seenTagIds.add(item.tag_id);
-        }
-      }
-    }
-
     console.log(`Prepared ${allInventoryData.length} items. Categories:`, categoryCounts);
 
-    // Step 3: Upsert in batches (server-side = fast, no round trips)
+    // Step 3: Delete all existing inventory and re-insert
+    // Server-side this is fast (no network round trips per batch)
+    const { error: deleteError } = await supabase.from('inventory').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (deleteError) throw deleteError;
+
+    // Step 4: Insert in batches
     const BATCH_SIZE = 500;
-    let totalUpserted = 0;
+    let totalInserted = 0;
 
     for (let i = 0; i < allInventoryData.length; i += BATCH_SIZE) {
       const batch = allInventoryData.slice(i, i + BATCH_SIZE);
-      const { error } = await supabase
-        .from('inventory')
-        .upsert(batch, { onConflict: 'item_code' });
-
+      const { error } = await supabase.from('inventory').insert(batch);
       if (error) {
         console.error(`Batch ${Math.floor(i / BATCH_SIZE) + 1} failed:`, error);
         throw error;
       }
-      totalUpserted += batch.length;
+      totalInserted += batch.length;
     }
 
     const itemsWithRfid = allInventoryData.filter(i => i.has_rfid_tag).length;
 
-    console.log(`Sync complete: ${totalUpserted} items upserted`);
+    console.log(`Sync complete: ${totalInserted} items inserted`);
 
     return new Response(JSON.stringify({
       success: true,
-      count: totalUpserted,
+      count: totalInserted,
       withRfid: itemsWithRfid,
-      withoutRfid: totalUpserted - itemsWithRfid,
+      withoutRfid: totalInserted - itemsWithRfid,
       categories: categoryCounts,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Sync error:', error);
     return new Response(JSON.stringify({ success: false, error: error.message }), {
       status: 500,
