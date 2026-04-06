@@ -64,6 +64,19 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Deduplicate tag_ids - if multiple items share a tag_id, only keep the first
+    const seenTagIds = new Set<string>();
+    for (const item of allInventoryData) {
+      if (item.tag_id) {
+        if (seenTagIds.has(item.tag_id)) {
+          item.tag_id = null;
+          item.has_rfid_tag = false;
+        } else {
+          seenTagIds.add(item.tag_id);
+        }
+      }
+    }
+
     console.log(`Prepared ${allInventoryData.length} items. Categories:`, categoryCounts);
 
     // Step 3: Upsert in batches (server-side = fast, no round trips)
