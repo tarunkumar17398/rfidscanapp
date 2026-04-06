@@ -18,7 +18,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ScannerProvider>
       <TooltipProvider>
-        <BrowserRouter basename={import.meta.env.PROD ? "/rfidscanapp" : ""}>
+        <BrowserRouter>
           <Toaster />
           <Sonner />
           <Routes>
