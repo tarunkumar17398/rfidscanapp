@@ -152,120 +152,20 @@ const Dashboard = () => {
 
   const autoSyncInventory = async () => {
     try {
-      console.log('=== AUTO-SYNC START ===');
-      console.log('Fetching inventory from CK Inventory API...');
-      const items = await fetchInventoryFromAPI();
-      console.log(`✓ Received ${items.length} total items from API`);
+      console.log('=== AUTO-SYNC START (server-side) ===');
+      const { data, error } = await supabase.functions.invoke('sync-inventory');
       
-      // Group items by category based on ITEM CODE prefix (characters 2-4, after "CK")
-      const itemsByCategory: Record<string, InventoryItem[]> = {
-        'Brass': [],
-        'Iron': [],
-        'Wood': [],
-        'Tanjore Paintings': [],
-      };
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Sync failed');
 
-      items.forEach((item, index) => {
-        const itemCode = item['ITEM CODE'];
-        if (!itemCode || itemCode.length < 4) {
-          console.warn(`Item ${index + 1} has invalid code:`, item);
-          return;
-        }
-        
-        // Extract the category code (characters 2-4, after "CK")
-        const code = itemCode.substring(2, 4).toUpperCase();
-        
-        // Match with category codes
-        for (const [category, prefix] of Object.entries(CATEGORY_CODES)) {
-          if (code === prefix) {
-            itemsByCategory[category].push(item);
-            break;
-          }
-        }
-      });
-
-      console.log('✓ Items grouped by category:', {
-        Brass: itemsByCategory['Brass'].length,
-        Iron: itemsByCategory['Iron'].length,
-        Wood: itemsByCategory['Wood'].length,
-        'Tanjore Paintings': itemsByCategory['Tanjore Paintings'].length,
-        Total: items.length
-      });
-
-      // STEP 1: Prepare ALL items for insertion first (don't delete yet)
-      console.log('=== STEP 1: Preparing data for insertion ===');
-      const allInventoryData = [];
-      
-      for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
-        if (categoryItems.length === 0) {
-          console.log(`  ${category}: 0 items (skipping)`);
-          continue;
-        }
-        
-        console.log(`  ${category}: ${categoryItems.length} items`);
-        
-        const inventoryData = categoryItems.map(item => {
-          const hasRfid = Boolean(item['RFID-EPC']?.trim());
-          return {
-            category,
-            item_code: item['ITEM CODE'],
-            particulars: item['PARTICULARS'],
-            size: item['SIZE'],
-            weight: item['Weight'],
-            tag_id: hasRfid ? item['RFID-EPC'] : null,
-            has_rfid_tag: hasRfid,
-          };
-        });
-        
-        allInventoryData.push(...inventoryData);
-      }
-      
-      console.log(`✓ Prepared ${allInventoryData.length} total items for insertion`);
-
-      // STEP 2: Upsert all items in parallel batches (no delete needed!)
-      console.log('=== STEP 2: Upserting items in parallel batches ===');
-      const BATCH_SIZE = 500;
-      const batches = [];
-      
-      for (let i = 0; i < allInventoryData.length; i += BATCH_SIZE) {
-        batches.push(allInventoryData.slice(i, i + BATCH_SIZE));
-      }
-      
-      console.log(`  Splitting into ${batches.length} parallel batches of up to ${BATCH_SIZE}...`);
-      
-      const results = await Promise.all(
-        batches.map(async (batch, idx) => {
-          console.log(`  Batch ${idx + 1}/${batches.length}: Upserting ${batch.length} items...`);
-          const { error } = await supabase
-            .from('inventory')
-            .upsert(batch, { onConflict: 'item_code' });
-          if (error) {
-            console.error(`✗ Batch ${idx + 1} failed:`, error);
-            throw error;
-          }
-          console.log(`  ✓ Batch ${idx + 1} done`);
-          return batch.length;
-        })
-      );
-      
-      const totalInserted = results.reduce((a, b) => a + b, 0);
-
-      // Count items with and without RFID tags
-      const itemsWithRfid = items.filter(item => Boolean(item['RFID-EPC']?.trim())).length;
-      const itemsWithoutRfid = items.length - itemsWithRfid;
-
-      console.log('=== AUTO-SYNC COMPLETE ===');
-      console.log(`✓ Total inserted: ${totalInserted} items`);
-      console.log(`  - With RFID: ${itemsWithRfid}`);
-      console.log(`  - Without RFID: ${itemsWithoutRfid}`);
+      console.log('=== AUTO-SYNC COMPLETE ===', data);
       
       toast({
         title: 'Inventory Synced',
-        description: `${totalInserted} items loaded (${itemsWithRfid} with RFID, ${itemsWithoutRfid} without)`,
+        description: `${data.count} items loaded (${data.withRfid} with RFID, ${data.withoutRfid} without)`,
       });
     } catch (error: any) {
       console.error('Auto-sync failed:', error);
-      // Silent fail - don't show error toast on startup
     }
   };
 
