@@ -106,7 +106,7 @@ const Dashboard = () => {
 
     // Throttle for realtime updates (fires at most once every 2 seconds)
     let lastFetchTime = 0;
-    let pendingFetch: NodeJS.Timeout | null = null;
+    let pendingFetch: ReturnType<typeof setTimeout> | null = null;
     
     // Subscribe to real-time scan updates with throttle to prevent server overload
     const channel = supabase
@@ -222,43 +222,33 @@ const Dashboard = () => {
       
       console.log(`✓ Prepared ${allInventoryData.length} total items for insertion`);
 
-      // STEP 2: Delete ALL existing inventory items at once
-      console.log('=== STEP 2: Deleting all existing inventory ===');
-      const { error: deleteError } = await supabase
-        .from('inventory')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
-
-      if (deleteError) {
-        console.error('✗ Error deleting inventory:', deleteError);
-        throw deleteError;
-      }
-      console.log('✓ All existing inventory deleted');
-
-      // STEP 3: Insert all new items in batches of 1000 (Supabase limit)
-      console.log('=== STEP 3: Inserting new items in batches ===');
-      const BATCH_SIZE = 1000;
-      let totalInserted = 0;
+      // STEP 2: Upsert all items in parallel batches (no delete needed!)
+      console.log('=== STEP 2: Upserting items in parallel batches ===');
+      const BATCH_SIZE = 500;
+      const batches = [];
       
       for (let i = 0; i < allInventoryData.length; i += BATCH_SIZE) {
-        const batch = allInventoryData.slice(i, i + BATCH_SIZE);
-        const batchNum = Math.floor(i / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(allInventoryData.length / BATCH_SIZE);
-        
-        console.log(`  Batch ${batchNum}/${totalBatches}: Inserting ${batch.length} items (items ${i + 1}-${i + batch.length})...`);
-        
-        const { error: insertError } = await supabase
-          .from('inventory')
-          .insert(batch);
-
-        if (insertError) {
-          console.error(`✗ Error inserting batch ${batchNum}:`, insertError);
-          throw insertError;
-        }
-
-        totalInserted += batch.length;
-        console.log(`  ✓ Batch ${batchNum} inserted successfully (${totalInserted}/${allInventoryData.length} total)`);
+        batches.push(allInventoryData.slice(i, i + BATCH_SIZE));
       }
+      
+      console.log(`  Splitting into ${batches.length} parallel batches of up to ${BATCH_SIZE}...`);
+      
+      const results = await Promise.all(
+        batches.map(async (batch, idx) => {
+          console.log(`  Batch ${idx + 1}/${batches.length}: Upserting ${batch.length} items...`);
+          const { error } = await supabase
+            .from('inventory')
+            .upsert(batch, { onConflict: 'item_code' });
+          if (error) {
+            console.error(`✗ Batch ${idx + 1} failed:`, error);
+            throw error;
+          }
+          console.log(`  ✓ Batch ${idx + 1} done`);
+          return batch.length;
+        })
+      );
+      
+      const totalInserted = results.reduce((a, b) => a + b, 0);
 
       // Count items with and without RFID tags
       const itemsWithRfid = items.filter(item => Boolean(item['RFID-EPC']?.trim())).length;
