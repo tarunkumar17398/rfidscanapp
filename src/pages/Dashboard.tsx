@@ -106,7 +106,7 @@ const Dashboard = () => {
 
     // Throttle for realtime updates (fires at most once every 2 seconds)
     let lastFetchTime = 0;
-    let pendingFetch: NodeJS.Timeout | null = null;
+    let pendingFetch: ReturnType<typeof setTimeout> | null = null;
     
     // Subscribe to real-time scan updates with throttle to prevent server overload
     const channel = supabase
