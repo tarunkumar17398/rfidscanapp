@@ -1,0 +1,1 @@
+ALTER TABLE public.inventory ADD CONSTRAINT inventory_item_code_unique UNIQUE (item_code);
