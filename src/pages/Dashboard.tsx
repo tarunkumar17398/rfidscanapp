@@ -512,8 +512,7 @@ const Dashboard = () => {
                   </TableBody>
                 </Table>
               </div>
-            )}
-          </CardContent>
+            </CardContent>
         </Card>
 
         {/* Live Missing Items — only during active scan */}
