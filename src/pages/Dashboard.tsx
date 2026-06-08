@@ -47,7 +47,7 @@ const Dashboard = () => {
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, smartMode, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
+  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -374,14 +374,18 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           <Card className="border-secondary">
-            <CardHeader className="p-3 sm:p-6">
-              <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-0">
-              <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">{animatedTotalScanned}</p>
-              <p className="text-xs text-muted-foreground mt-1">RFID tags found</p>
-            </CardContent>
-          </Card>
+  <CardHeader className="p-3 sm:p-6">
+    <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
+  </CardHeader>
+  <CardContent className="p-3 sm:p-6 pt-0">
+    <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">
+      {scanning ? uniqueTagsCount : animatedTotalScanned}
+    </p>
+    <p className="text-xs text-muted-foreground mt-1">
+      {scanning ? 'Live count' : 'RFID tags found'}
+    </p>
+  </CardContent>
+</Card>
           <Card className="border-destructive">
             <CardHeader className="p-3 sm:p-6">
               <CardTitle className="text-xs sm:text-lg">Missing</CardTitle>

@@ -17,7 +17,7 @@ interface ScanAttempt {
 export interface SmartScanStats {
   uniqueTagsFound: number;
   expectedTotal: number;
-  discoveryRate: number; // new unique tags per second
+  discoveryRate: number;
   scanComplete: boolean;
   elapsedSeconds: number;
   currentPhase: 'discovery' | 'sweep' | 'complete';
@@ -34,6 +34,7 @@ interface ScannerContextType {
   lastScannedTag: string | null;
   scanAttempts: ScanAttempt[];
   totalScans: number;
+  uniqueTagsCount: number;
   scanRate: number;
   pulseTrigger: number;
   sessionMode: SessionMode;
@@ -60,22 +61,23 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [lastScannedTag, setLastScannedTag] = useState<string | null>(null);
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
+  const [uniqueTagsCount, setUniqueTagsCount] = useState(0); // ← NEW: instant local unique count
   const totalScansRef = useRef(0);
   const [scanRate, setScanRate] = useState(0);
   const [pulseTrigger, setPulseTrigger] = useState(0);
   const [sessionMode, setSessionModeState] = useState<SessionMode>('S1');
   const [smartMode, setSmartModeState] = useState(false);
-  const [minRssiThreshold, setMinRssiThreshold] = useState(-80); // dBm, filter weak reads
+  const [minRssiThreshold, setMinRssiThreshold] = useState(-90); // raised from -80 to -90
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
-  
+
   // Session-based duplicate tracking
-  const sessionScansRef = useState<Set<string>>(() => new Set())[0];
-  const tagCountsRef = useState<Map<string, number>>(() => new Map())[0];
-  
-  // Server-confirmed tags tracking (Feature 5: only send new tags to API)
-  const serverConfirmedTagsRef = useState<Set<string>>(() => new Set())[0];
-  
+  const sessionScansRef = useRef<Set<string>>(new Set());
+  const tagCountsRef = useRef<Map<string, number>>(new Map());
+
+  // Server-confirmed tags (only send new unique tags to API)
+  const serverConfirmedTagsRef = useRef<Set<string>>(new Set());
+
   // Smart scan stats
   const [smartScanStats, setSmartScanStats] = useState<SmartScanStats>({
     uniqueTagsFound: 0,
@@ -88,21 +90,21 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     rssiMax: 0,
     rssiAvg: 0,
   });
-  
-  // Discovery rate tracking for auto-session switching
+
+  // Discovery rate tracking
   const scanStartTimeRef = useRef<number | null>(null);
-  const discoveryTimestampsRef = useRef<number[]>([]); // timestamps of unique tag discoveries
+  const discoveryTimestampsRef = useRef<number[]>([]);
   const lastSessionSwitchRef = useRef(0);
   const noNewTagsStartRef = useRef<number | null>(null);
   const rssiValuesRef = useRef<number[]>([]);
-  
-  // Batching for API calls
-  const scanBufferRef = useState<Array<{ tagId: string; time: string; rssi: number }>>(() => [])[0];
+
+  // API batch buffer (200ms — only for Supabase, not UI)
+  const apiBatchBufferRef = useRef<string[]>([]);
   const lastBatchTimeRef = useRef(Date.now());
   const scanCountInLastSecondRef = useRef<number[]>([]);
   const lastMilestoneRef = useRef(0);
 
-  // Fetch expected inventory count for progress tracking
+  // Fetch expected inventory count
   useEffect(() => {
     const fetchExpectedCount = async () => {
       try {
@@ -125,25 +127,20 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       const startTime = scanStartTimeRef.current || now;
       const elapsedSeconds = Math.floor((now - startTime) / 1000);
 
-      // Calculate discovery rate (unique tags in last 5 seconds)
       const recentDiscoveries = discoveryTimestampsRef.current.filter(t => now - t < 5000);
       const discoveryRate = recentDiscoveries.length / 5;
 
-      // RSSI stats
       const rssiVals = rssiValuesRef.current;
       const rssiMin = rssiVals.length > 0 ? Math.min(...rssiVals.slice(-100)) : 0;
       const rssiMax = rssiVals.length > 0 ? Math.max(...rssiVals.slice(-100)) : 0;
       const rssiAvg = rssiVals.length > 0 ? Math.round(rssiVals.slice(-100).reduce((a, b) => a + b, 0) / Math.min(rssiVals.length, 100)) : 0;
 
-      const uniqueCount = sessionScansRef.size;
-      
-      // Auto-session switching logic
+      const uniqueCount = sessionScansRef.current.size;
       let currentPhase: 'discovery' | 'sweep' | 'complete' = 'discovery';
-      
+
       if (discoveryRate < 0.4 && uniqueCount > 10 && elapsedSeconds > 10) {
-        // Discovery rate dropped - switch to S0 for sweep
         if (sessionMode === 'S1' && now - lastSessionSwitchRef.current > 15000) {
-          console.log('🔄 Smart Mode: Discovery rate low, switching to S0 for sweep...');
+          console.log('🔄 Smart Mode: switching to S0 for sweep...');
           scanner.setSession('S0');
           setSessionModeState('S0');
           lastSessionSwitchRef.current = now;
@@ -155,7 +152,6 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         }
         currentPhase = 'sweep';
 
-        // Check if scan is complete (no new tags for 15 seconds in sweep mode)
         if (discoveryRate === 0) {
           if (!noNewTagsStartRef.current) {
             noNewTagsStartRef.current = now;
@@ -169,9 +165,9 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         noNewTagsStartRef.current = null;
       }
 
-      setSmartScanStats({
+      setSmartScanStats(prev => ({
         uniqueTagsFound: uniqueCount,
-        expectedTotal: smartScanStats.expectedTotal,
+        expectedTotal: prev.expectedTotal,
         discoveryRate: Math.round(discoveryRate * 10) / 10,
         scanComplete: currentPhase === 'complete',
         elapsedSeconds,
@@ -179,79 +175,33 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         rssiMin,
         rssiMax,
         rssiAvg,
-      });
+      }));
     }, 1000);
 
     return () => clearInterval(smartInterval);
-  }, [smartMode, scanning, sessionMode, scanner, toast, smartScanStats.expectedTotal]);
+  }, [smartMode, scanning, sessionMode, scanner, toast]);
 
-  // Batched UI updates every 500ms
+  // API batch — fires every 200ms, only sends to Supabase
   useEffect(() => {
     const batchInterval = setInterval(() => {
-      if (scanBufferRef.length === 0) return;
+      if (apiBatchBufferRef.current.length === 0) return;
 
-      const batchCopy = [...scanBufferRef];
-      scanBufferRef.length = 0;
+      const batchCopy = [...apiBatchBufferRef.current];
+      apiBatchBufferRef.current = [];
 
-      // Calculate scan rate
-      const scansInBatch = batchCopy.length;
-      scanCountInLastSecondRef.current.push(scansInBatch);
-      
+      // Scan rate calculation
+      scanCountInLastSecondRef.current.push(batchCopy.length);
       if (scanCountInLastSecondRef.current.length > 4) {
         scanCountInLastSecondRef.current.shift();
       }
-      
       const avgRate = Math.round(
-        (scanCountInLastSecondRef.current.reduce((a, b) => a + b, 0) / 
-        scanCountInLastSecondRef.current.length) * 2
+        (scanCountInLastSecondRef.current.reduce((a, b) => a + b, 0) /
+          scanCountInLastSecondRef.current.length) * 5
       );
-      
       setScanRate(avgRate);
 
-      totalScansRef.current += scansInBatch;
-      const newTotal = totalScansRef.current;
-      setTotalScans(newTotal);
-
-      // Milestones
-      const milestones = [10, 50, 100, 500, 1000, 2000, 5000];
-      const reachedMilestone = milestones.find(
-        m => newTotal >= m && lastMilestoneRef.current < m
-      );
-      
-      if (reachedMilestone) {
-        lastMilestoneRef.current = reachedMilestone;
-        toast({
-          title: `🎯 Milestone: ${reachedMilestone} scans!`,
-          description: `Scan rate: ${avgRate} tags/sec`,
-          duration: 3000
-        });
-      }
-
-      setPulseTrigger(prev => prev + 1);
-
-      // Add to scan attempts with RSSI
-      setScanAttempts(prev => [
-        ...batchCopy.map(scan => {
-          const count = tagCountsRef.get(scan.tagId) || 1;
-          const isDuplicate = count > 1;
-          return {
-            tagId: scan.tagId,
-            time: scan.time,
-            success: true,
-            duplicate: isDuplicate,
-            count,
-            rssi: scan.rssi
-          };
-        }),
-        ...prev
-      ].slice(0, 100));
-
-      // Feature 1 & 5: Only send NEW unique tags to the server
-      const newTagIds = batchCopy
-        .map(scan => scan.tagId)
-        .filter(tagId => !serverConfirmedTagsRef.has(tagId));
-      
-      // Deduplicate within this batch
+      // Only send new unique tags to server
+      const newTagIds = batchCopy.filter(tagId => !serverConfirmedTagsRef.current.has(tagId));
       const uniqueNewTagIds = [...new Set(newTagIds)];
 
       if (uniqueNewTagIds.length > 0) {
@@ -259,16 +209,13 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
           if (isOnline) {
             try {
               const result = await api.batchScan(uniqueNewTagIds);
-              // Mark successfully processed tags as server-confirmed
               if (result?.results) {
                 for (const r of result.results) {
-                  if (r.success) {
-                    serverConfirmedTagsRef.add(r.tagId);
-                  }
+                  if (r.success) serverConfirmedTagsRef.current.add(r.tagId);
                 }
               }
             } catch (error) {
-              console.error('Batch scan failed, falling back to offline storage:', error);
+              console.error('Batch scan failed, saving offline:', error);
               for (const tagId of uniqueNewTagIds) {
                 await syncManager.addPendingScan(tagId);
               }
@@ -282,62 +229,87 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       }
 
       lastBatchTimeRef.current = Date.now();
-    }, 500);
+    }, 200);
 
     return () => clearInterval(batchInterval);
-  }, [isOnline, toast]);
+  }, [isOnline]);
 
-  // Reset scan rate when no scans for 2 seconds
+  // Reset scan rate when idle
   useEffect(() => {
     const rateResetInterval = setInterval(() => {
-      if (scanBufferRef.length === 0 && Date.now() - lastBatchTimeRef.current > 2000) {
+      if (apiBatchBufferRef.current.length === 0 && Date.now() - lastBatchTimeRef.current > 2000) {
         setScanRate(0);
         scanCountInLastSecondRef.current = [];
       }
     }, 2000);
-
     return () => clearInterval(rateResetInterval);
   }, []);
 
+  // Tag scanned callback — UI updates immediately, API batched separately
   useEffect(() => {
     scanner.setOnStatusChange(setScannerStatus);
     scanner.setOnBatteryUpdate(setBatteryPercentage);
-    scanner.setOnTagScanned(async (data: TagReadData) => {
+    scanner.setOnTagScanned((data: TagReadData) => {
       const { tagId, rssi } = data;
-      
-      // Feature 4: RSSI filtering - skip weak signals
+
+      // RSSI filter
       if (rssi < minRssiThreshold) {
-        console.log(`📶 Filtered weak tag: ${tagId} (RSSI: ${rssi} < threshold: ${minRssiThreshold})`);
+        console.log(`📶 Filtered weak tag: ${tagId} (RSSI: ${rssi} < ${minRssiThreshold})`);
         return;
       }
 
-      // Track RSSI values for stats
       rssiValuesRef.current.push(rssi);
-      
       setLastScannedTag(tagId);
-      
-      const isDuplicate = sessionScansRef.has(tagId);
-      const currentCount = (tagCountsRef.get(tagId) || 0) + 1;
-      
+      setPulseTrigger(prev => prev + 1);
+
+      const isDuplicate = sessionScansRef.current.has(tagId);
+      const currentCount = (tagCountsRef.current.get(tagId) || 0) + 1;
+      tagCountsRef.current.set(tagId, currentCount);
+
       if (!isDuplicate) {
-        sessionScansRef.add(tagId);
-        // Track discovery timestamp for rate calculation
+        sessionScansRef.current.add(tagId);
         discoveryTimestampsRef.current.push(Date.now());
-        console.log(`✓ New tag: ${tagId} (RSSI: ${rssi})`);
+        console.log(`✓ New unique tag: ${tagId} (RSSI: ${rssi})`);
+
+        // ── Update UI counters immediately ──
+        const newUniqueCount = sessionScansRef.current.size;
+        setUniqueTagsCount(newUniqueCount);
+        totalScansRef.current += 1;
+        setTotalScans(totalScansRef.current);
+
+        // Milestones
+        const milestones = [10, 50, 100, 500, 1000, 2000, 5000];
+        const reached = milestones.find(m => newUniqueCount === m);
+        if (reached) {
+          lastMilestoneRef.current = reached;
+          toast({
+            title: `🎯 ${reached} unique tags scanned!`,
+            duration: 3000
+          });
+        }
+
+        // Queue for API batch
+        apiBatchBufferRef.current.push(tagId);
       } else {
         console.log(`↻ Duplicate: ${tagId} (count: ${currentCount}, RSSI: ${rssi})`);
       }
-      
-      tagCountsRef.set(tagId, currentCount);
-      
+
+      // ── Update scan attempts list immediately (for LiveScans page) ──
       const scanTime = new Date().toLocaleString();
-      scanBufferRef.push({ tagId, time: scanTime, rssi });
+      setScanAttempts(prev => [{
+        tagId,
+        time: scanTime,
+        success: true,
+        duplicate: isDuplicate,
+        count: currentCount,
+        rssi
+      }, ...prev].slice(0, 200));
     });
 
     return () => {
       scanner.disconnect();
     };
-  }, [scanner, minRssiThreshold]);
+  }, [scanner, minRssiThreshold, toast]);
 
   const connectScanner = async () => {
     const connected = await scanner.connect();
@@ -352,14 +324,6 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     discoveryTimestampsRef.current = [];
     noNewTagsStartRef.current = null;
     rssiValuesRef.current = [];
-    
-    // Smart mode: always start with S1 for fast discovery
-    if (smartMode && sessionMode !== 'S1') {
-      await scanner.setSession('S1');
-      setSessionModeState('S1');
-      lastSessionSwitchRef.current = Date.now();
-    }
-    
     await scanner.startScan();
     setScanning(true);
   };
@@ -380,13 +344,15 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const clearScanAttempts = () => {
     setScanAttempts([]);
     setTotalScans(0);
+    setUniqueTagsCount(0);
     totalScansRef.current = 0;
     setScanRate(0);
     lastMilestoneRef.current = 0;
     scanCountInLastSecondRef.current = [];
-    sessionScansRef.clear();
-    tagCountsRef.clear();
-    serverConfirmedTagsRef.clear();
+    sessionScansRef.current.clear();
+    tagCountsRef.current.clear();
+    serverConfirmedTagsRef.current.clear();
+    apiBatchBufferRef.current = [];
     discoveryTimestampsRef.current = [];
     rssiValuesRef.current = [];
     noNewTagsStartRef.current = null;
@@ -409,7 +375,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     toast({
       title: `Session Mode: ${mode}`,
       description: mode === 'S0' ? 'Max speed, most duplicates' :
-                   mode === 'S1' ? 'Balanced (recommended for dense areas)' :
+                   mode === 'S1' ? 'Balanced (recommended)' :
                    mode === 'S2' ? 'Fewer duplicates, slower discovery' :
                    'Minimal duplicates, one-time reads',
       duration: 3000
@@ -437,6 +403,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         lastScannedTag,
         scanAttempts,
         totalScans,
+        uniqueTagsCount,
         scanRate,
         pulseTrigger,
         sessionMode,
