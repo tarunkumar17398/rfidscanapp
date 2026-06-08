@@ -24,6 +24,9 @@ export interface SmartScanStats {
   rssiMin: number;
   rssiMax: number;
   rssiAvg: number;
+  uniqueTagsCount: number;
+  categoryCount: Record<string, number>;
+  
 }
 
 interface ScannerContextType {
@@ -62,6 +65,8 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
   const [uniqueTagsCount, setUniqueTagsCount] = useState(0); // ← NEW: instant local unique count
+  const [categoryCount, setCategoryCount] = useState<Record<string, number>>({});
+  const tagMapRef = useRef<Record<string, { category: string; particulars: string; itemCode: string }>>({});
   const totalScansRef = useRef(0);
   const [scanRate, setScanRate] = useState(0);
   const [pulseTrigger, setPulseTrigger] = useState(0);
@@ -106,16 +111,22 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch expected inventory count
   useEffect(() => {
-    const fetchExpectedCount = async () => {
+    const fetchInitialData = async () => {
       try {
+        // Load expected count
         const stats = await api.getStats();
         const totalWithRfid = stats.stats?.reduce((sum: number, s: any) => sum + (s.totalWithRfid || 0), 0) || 0;
         setSmartScanStats(prev => ({ ...prev, expectedTotal: totalWithRfid }));
+
+        // Load full tag map into memory
+        const map = await api.getTagMap();
+        tagMapRef.current = map;
+        console.log(`🗺️ Tag map ready: ${Object.keys(map).length} tags`);
       } catch (e) {
-        console.error('Failed to fetch expected inventory count:', e);
+        console.error('Failed to fetch initial data:', e);
       }
     };
-    fetchExpectedCount();
+    fetchInitialData();
   }, []);
 
   // Smart mode: monitor discovery rate and auto-switch sessions
@@ -188,6 +199,12 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
 
       const batchCopy = [...apiBatchBufferRef.current];
       apiBatchBufferRef.current = [];
+
+      // Reload tag map fresh on new cycle
+    api.getTagMap().then(map => {
+      tagMapRef.current = map;
+      console.log(`🗺️ Tag map reloaded: ${Object.keys(map).length} tags`);
+    });
 
       // Scan rate calculation
       scanCountInLastSecondRef.current.push(batchCopy.length);
@@ -269,13 +286,21 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
       if (!isDuplicate) {
         sessionScansRef.current.add(tagId);
         discoveryTimestampsRef.current.push(Date.now());
-        console.log(`✓ New unique tag: ${tagId} (RSSI: ${rssi})`);
+
+        // Look up category from local tag map
+        const itemInfo = tagMapRef.current[tagId];
+        const category = itemInfo?.category || 'Unknown';
+        console.log(`✓ New unique tag: ${tagId} | Category: ${category} (RSSI: ${rssi})`);
 
         // ── Update UI counters immediately ──
         const newUniqueCount = sessionScansRef.current.size;
         setUniqueTagsCount(newUniqueCount);
-        totalScansRef.current += 1;
-        setTotalScans(totalScansRef.current);
+
+        // ── Update category count immediately ──
+        setCategoryCount(prev => ({
+          ...prev,
+          [category]: (prev[category] || 0) + 1
+        }));
 
         // Milestones
         const milestones = [10, 50, 100, 500, 1000, 2000, 5000];
@@ -345,6 +370,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     setScanAttempts([]);
     setTotalScans(0);
     setUniqueTagsCount(0);
+    setCategoryCount({});
     totalScansRef.current = 0;
     setScanRate(0);
     lastMilestoneRef.current = 0;
@@ -404,6 +430,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         scanAttempts,
         totalScans,
         uniqueTagsCount,
+        categoryCount,
         scanRate,
         pulseTrigger,
         sessionMode,

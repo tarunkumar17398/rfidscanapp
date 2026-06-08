@@ -47,7 +47,7 @@ const Dashboard = () => {
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
+  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, categoryCount, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -433,15 +433,23 @@ const Dashboard = () => {
                   </TableHeader>
                   <TableBody>
                     {stats.map((stat) => (
-                      <TableRow key={stat.category}>
-                        <TableCell className="font-medium">{stat.category}</TableCell>
-                        <AnimatedTableCell value={stat.total} className="font-semibold" />
-                        <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
-                        <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
-                        <AnimatedTableCell value={stat.scanned} className="text-secondary font-semibold" />
-                        <AnimatedTableCell value={stat.missing} className="text-destructive font-semibold" />
-                      </TableRow>
-                    ))}
+  <TableRow key={stat.category}>
+    <TableCell className="font-medium">{stat.category}</TableCell>
+    <AnimatedTableCell value={stat.total} className="font-semibold" />
+    <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
+    <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
+    <TableCell className="text-right font-semibold text-secondary tabular-nums">
+      {scanning && categoryCount[stat.category] !== undefined
+        ? categoryCount[stat.category]
+        : stat.scanned}
+    </TableCell>
+    <TableCell className="text-right font-semibold text-destructive tabular-nums">
+      {scanning && categoryCount[stat.category] !== undefined
+        ? Math.max(0, stat.totalWithRfid - (categoryCount[stat.category] || 0))
+        : stat.missing}
+    </TableCell>
+  </TableRow>
+))}
                   </TableBody>
                 </Table>
               </div>

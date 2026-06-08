@@ -548,4 +548,49 @@ export const api = {
       throw error;
     }
   },
+  // Load all RFID-tagged inventory into memory for instant local lookup
+  getTagMap: async (): Promise<Record<string, { category: string; particulars: string; itemCode: string }>> => {
+    try {
+      let allItems: any[] = [];
+      let from = 0;
+      const batchSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('inventory')
+          .select('tag_id, category, particulars, item_code')
+          .eq('has_rfid_tag', true)
+          .not('tag_id', 'is', null)
+          .range(from, from + batchSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allItems = allItems.concat(data);
+          from += batchSize;
+          if (data.length < batchSize) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const tagMap: Record<string, { category: string; particulars: string; itemCode: string }> = {};
+      for (const item of allItems) {
+        if (item.tag_id) {
+          tagMap[item.tag_id] = {
+            category: item.category || 'Unknown',
+            particulars: item.particulars || '',
+            itemCode: item.item_code || '',
+          };
+        }
+      }
+
+      console.log(`✅ Tag map loaded: ${Object.keys(tagMap).length} items`);
+      return tagMap;
+    } catch (error) {
+      console.error('Failed to load tag map:', error);
+      return {};
+    }
+  },
 };
