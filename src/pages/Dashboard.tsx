@@ -46,8 +46,10 @@ const Dashboard = () => {
   const [stats, setStats] = useState<CategoryStats[]>([]);
   const [cycleInfo, setCycleInfo] = useState<CycleInfo | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [batteryWarningShown, setBatteryWarningShown] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, categoryCount, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
+  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, categoryCount, missingItems, batteryPercentage, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -267,6 +269,31 @@ const Dashboard = () => {
   const animatedTotalWithRfid = useAnimatedCounter(totalWithRfid);
   const animatedTotalWithoutRfid = useAnimatedCounter(totalWithoutRfid);
 
+  // Battery warning effect
+  useEffect(() => {
+    if (batteryPercentage !== null && batteryPercentage <= 20 && !batteryWarningShown) {
+      setBatteryWarningShown(true);
+      toast({
+        title: '🔋 Low Battery Warning',
+        description: `Scanner battery at ${batteryPercentage}%. Please charge soon.`,
+        variant: 'destructive',
+        duration: 6000
+      });
+    }
+    if (batteryPercentage !== null && batteryPercentage > 20) {
+      setBatteryWarningShown(false);
+    }
+  }, [batteryPercentage, batteryWarningShown, toast]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  const formatDate = (dateString: string | null) => {
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleString('en-IN', { 
@@ -325,6 +352,21 @@ const Dashboard = () => {
             Last synced: {new Date(lastSyncTime).toLocaleString('en-IN')}
           </div>
         )}
+
+        {/* Battery Warning Card */}
+      {batteryPercentage !== null && batteryPercentage <= 20 && (
+        <Card className="border-destructive bg-destructive/10">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🔋</span>
+              <div>
+                <p className="font-semibold text-destructive text-sm">Low Battery: {batteryPercentage}%</p>
+                <p className="text-xs text-muted-foreground">Please charge your scanner soon</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
         {/* Cycle Info Card */}
         {cycleInfo && (
@@ -432,23 +474,41 @@ const Dashboard = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stats.map((stat) => (
-  <TableRow key={stat.category}>
-    <TableCell className="font-medium">{stat.category}</TableCell>
-    <AnimatedTableCell value={stat.total} className="font-semibold" />
-    <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
-    <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
-    <TableCell className="text-right font-semibold text-secondary tabular-nums">
-      {scanning && categoryCount[stat.category] !== undefined
-        ? categoryCount[stat.category]
-        : stat.scanned}
-    </TableCell>
-    <TableCell className="text-right font-semibold text-destructive tabular-nums">
-      {scanning && categoryCount[stat.category] !== undefined
-        ? Math.max(0, stat.totalWithRfid - (categoryCount[stat.category] || 0))
-        : stat.missing}
-    </TableCell>
-  </TableRow>
+                    {stats.map((stat) => {
+  const liveScanned = scanning && categoryCount[stat.category] !== undefined
+    ? categoryCount[stat.category]
+    : stat.scanned;
+  const liveMissing = scanning && categoryCount[stat.category] !== undefined
+    ? Math.max(0, stat.totalWithRfid - (categoryCount[stat.category] || 0))
+    : stat.missing;
+  const progressPct = stat.totalWithRfid > 0
+    ? Math.min(100, Math.round((liveScanned / stat.totalWithRfid) * 100))
+    : 0;
+
+  return (
+    <TableRow key={stat.category}>
+      <TableCell className="font-medium">
+        <div>{stat.category}</div>
+        <div className="w-full bg-muted rounded-full h-1.5 mt-1">
+          <div
+            className="bg-secondary h-1.5 rounded-full transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <div className="text-xs text-muted-foreground mt-0.5">{progressPct}%</div>
+      </TableCell>
+      <AnimatedTableCell value={stat.total} className="font-semibold" />
+      <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
+      <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
+      <TableCell className="text-right font-semibold text-secondary tabular-nums">
+        {liveScanned}
+      </TableCell>
+      <TableCell className="text-right font-semibold text-destructive tabular-nums">
+        {liveMissing}
+      </TableCell>
+    </TableRow>
+  );
+})}
 ))}
                   </TableBody>
                 </Table>
@@ -456,6 +516,64 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Live Missing Items — only during active scan */}
+        {scanning && (
+          <Card>
+            <CardHeader className="p-4 sm:p-6 pb-2">
+              <CardTitle className="text-lg sm:text-xl">
+                Missing Items
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  (Live — updates as you scan)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-2 space-y-2">
+              {['Brass', 'Iron', 'Wood', 'Tanjore Paintings'].map(category => {
+                const items = missingItems[category] || [];
+                const isExpanded = expandedCategories[category];
+                return (
+                  <div key={category} className="border rounded-lg overflow-hidden">
+                    <button
+                      className="w-full flex items-center justify-between p-3 bg-muted/50 hover:bg-muted transition-colors"
+                      onClick={() => toggleCategory(category)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm">{category}</span>
+                        {items.length === 0 ? (
+                          <span className="text-xs text-green-500 font-medium">✓ All found</span>
+                        ) : (
+                          <span className="text-xs bg-destructive/20 text-destructive px-2 py-0.5 rounded-full font-medium">
+                            {items.length} missing
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground text-sm">
+                        {isExpanded ? '▼' : '▶'}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="divide-y">
+                        {items.length === 0 ? (
+                          <div className="p-3 text-center text-sm text-green-500">
+                            🎉 All {category} items scanned!
+                          </div>
+                        ) : (
+                          items.map(item => (
+                            <div key={item.tagId} className="flex items-center justify-between p-3 text-sm">
+                              <span className="text-foreground">{item.particulars || 'Unknown Item'}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{item.itemCode}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Scan Progress (Zebra-inspired) */}
         <ScanProgress />

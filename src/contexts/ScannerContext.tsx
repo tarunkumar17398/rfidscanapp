@@ -26,6 +26,7 @@ export interface SmartScanStats {
   rssiAvg: number;
   uniqueTagsCount: number;
   categoryCount: Record<string, number>;
+  missingItems: Record<string, { tagId: string; particulars: string; itemCode: string }[]>;
   
 }
 
@@ -66,6 +67,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [totalScans, setTotalScans] = useState(0);
   const [uniqueTagsCount, setUniqueTagsCount] = useState(0); // ← NEW: instant local unique count
   const [categoryCount, setCategoryCount] = useState<Record<string, number>>({});
+  const [missingItems, setMissingItems] = useState<Record<string, { tagId: string; particulars: string; itemCode: string }[]>>({});
   const tagMapRef = useRef<Record<string, { category: string; particulars: string; itemCode: string }>>({});
   const totalScansRef = useRef(0);
   const [scanRate, setScanRate] = useState(0);
@@ -75,6 +77,25 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [minRssiThreshold, setMinRssiThreshold] = useState(-90); // raised from -80 to -90
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
+
+  // Build missing items grouped by category
+  const buildMissingItems = (
+    map: Record<string, { category: string; particulars: string; itemCode: string }>,
+    scannedSet: Set<string>
+  ) => {
+    const missing: Record<string, { tagId: string; particulars: string; itemCode: string }[]> = {};
+    for (const [tagId, item] of Object.entries(map)) {
+      if (!scannedSet.has(tagId)) {
+        if (!missing[item.category]) missing[item.category] = [];
+        missing[item.category].push({
+          tagId,
+          particulars: item.particulars,
+          itemCode: item.itemCode,
+        });
+      }
+    }
+    setMissingItems(missing);
+  };
 
   // Session-based duplicate tracking
   const sessionScansRef = useRef<Set<string>>(new Set());
@@ -119,9 +140,12 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         setSmartScanStats(prev => ({ ...prev, expectedTotal: totalWithRfid }));
 
         // Load full tag map into memory
-        const map = await api.getTagMap();
+       const map = await api.getTagMap();
         tagMapRef.current = map;
         console.log(`🗺️ Tag map ready: ${Object.keys(map).length} tags`);
+
+        // Build initial missing items list (all items missing at start)
+        buildMissingItems(map, new Set());
       } catch (e) {
         console.error('Failed to fetch initial data:', e);
       }
@@ -204,6 +228,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     api.getTagMap().then(map => {
       tagMapRef.current = map;
       console.log(`🗺️ Tag map reloaded: ${Object.keys(map).length} tags`);
+      buildMissingItems(map, new Set());
     });
 
       // Scan rate calculation
@@ -302,6 +327,22 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
           [category]: (prev[category] || 0) + 1
         }));
 
+        // ── Update missing items list immediately ──
+        buildMissingItems(tagMapRef.current, sessionScansRef.current);
+
+        // ── Auto-stop when all items found ──
+        const totalTagged = Object.keys(tagMapRef.current).length;
+        if (totalTagged > 0 && sessionScansRef.current.size >= totalTagged) {
+          console.log('🎉 All items found! Auto-stopping scan...');
+          scanner.stopScan();
+          setScanning(false);
+          toast({
+            title: '🎉 All Items Found!',
+            description: `All ${totalTagged} RFID tagged items scanned successfully.`,
+            duration: 5000
+          });
+        }
+
         // Milestones
         const milestones = [10, 50, 100, 500, 1000, 2000, 5000];
         const reached = milestones.find(m => newUniqueCount === m);
@@ -371,6 +412,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     setTotalScans(0);
     setUniqueTagsCount(0);
     setCategoryCount({});
+    setMissingItems({});
     totalScansRef.current = 0;
     setScanRate(0);
     lastMilestoneRef.current = 0;
@@ -431,6 +473,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         totalScans,
         uniqueTagsCount,
         categoryCount,
+        missingItems,
         scanRate,
         pulseTrigger,
         sessionMode,
