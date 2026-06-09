@@ -166,8 +166,20 @@ const Dashboard = () => {
     try {
       await api.startCycle();
       clearScanAttempts();
+      localStorage.setItem('cycleStartTime', Date.now().toString());
       toast({ title: 'Success', description: 'New cycle started' });
       fetchStats();
+
+      // Send WhatsApp notification
+      fetch('https://evolution-api-n8n.xblns2.easypanel.host/webhook/bd117572-2308-40a7-90d0-323670b97709', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cycle_start',
+          date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        })
+      }).catch(err => console.error('WhatsApp notification failed:', err));
+
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to start cycle', variant: 'destructive' });
     }
@@ -178,6 +190,42 @@ const Dashboard = () => {
       await api.finishCycle();
       toast({ title: 'Success', description: 'Cycle finished' });
       fetchStats();
+
+      // Calculate duration
+      const cycleStartTime = localStorage.getItem('cycleStartTime');
+      let duration = 'N/A';
+      if (cycleStartTime) {
+        const mins = Math.round((Date.now() - parseInt(cycleStartTime)) / 60000);
+        duration = mins < 60 ? `${mins} mins` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+        localStorage.removeItem('cycleStartTime');
+      }
+
+      const total = stats.reduce((sum, s) => sum + s.totalWithRfid, 0);
+      const scanned = stats.reduce((sum, s) => sum + s.scanned, 0);
+      const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
+      const accuracy = total > 0 ? ((scanned / total) * 100).toFixed(1) : '0';
+
+      // Send WhatsApp report
+      fetch('https://evolution-api-n8n.xblns2.easypanel.host/webhook/bd117572-2308-40a7-90d0-323670b97709', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'cycle_end',
+          date: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+          duration,
+          scanned,
+          total,
+          accuracy,
+          totalMissing,
+          categories: stats.map(s => ({
+            name: s.category,
+            scanned: s.scanned,
+            total: s.totalWithRfid,
+            missing: s.missing
+          }))
+        })
+      }).catch(err => console.error('WhatsApp report failed:', err));
+
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to finish cycle', variant: 'destructive' });
     }
