@@ -264,12 +264,13 @@ export class RFIDScanner {
       }
     }
 
-    // RSSI at byte 5
+    // RSSI at byte 6
     let rssi = -60;
-    if (value.byteLength > 5) {
-      const rawRssi = value.getUint8(5);
-      rssi = rawRssi > 127 ? rawRssi - 256 : -rawRssi;
-      console.log('📶 RSSI:', rssi, 'dBm');
+    if (value.byteLength > 6) {
+      const rawRssi = value.getUint8(6);
+      // Two's complement signed byte as per Chafon SDK spec
+      rssi = rawRssi > 127 ? rawRssi - 256 : rawRssi;
+      console.log('📶 RSSI:', rssi, 'dBm (raw byte:', rawRssi, ')');
     }
 
     // EPC at byte 10 (length) and byte 11+ (data)
