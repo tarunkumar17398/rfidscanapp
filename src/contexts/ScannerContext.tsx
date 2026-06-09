@@ -77,6 +77,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [minRssiThreshold, setMinRssiThreshold] = useState(-90); // raised from -80 to -90
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Build missing items grouped by category
   const buildMissingItems = (
@@ -276,6 +277,28 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(batchInterval);
   }, [isOnline]);
 
+  // Auto-sync when coming back online
+  useEffect(() => {
+    if (isOnline) {
+      syncManager.syncPendingScans().then(({ synced, failed }) => {
+        if (synced > 0) {
+          toast({
+            title: `✅ Synced ${synced} offline scans`,
+            description: failed > 0 ? `${failed} failed` : 'All scans uploaded successfully',
+            duration: 4000
+          });
+        }
+      });
+      syncManager.getPendingCount().then(setPendingCount);
+    }
+  }, [isOnline]);
+
+  // Track pending count
+  useEffect(() => {
+    syncManager.onPendingCountChange(setPendingCount);
+    syncManager.getPendingCount().then(setPendingCount);
+  }, []);
+
   // Reset scan rate when idle
   useEffect(() => {
     const rateResetInterval = setInterval(() => {
@@ -474,6 +497,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         uniqueTagsCount,
         categoryCount,
         missingItems,
+        pendingCount: number;
         scanRate,
         pulseTrigger,
         sessionMode,
@@ -488,6 +512,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         setSessionMode,
         setSmartMode,
         setMinRssiThreshold,
+        pendingCount: number;
       }}
     >
       {children}

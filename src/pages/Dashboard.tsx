@@ -16,6 +16,7 @@ import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { AnimatedTableCell } from '@/components/AnimatedTableCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SessionMode } from '@/lib/rfidScanner';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 interface CategoryStats {
   category: string;
@@ -41,12 +42,12 @@ const Dashboard = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const {
-    scanning, scannerStatus, sessionMode, smartMode,
-    uniqueTagsCount, categoryCount, missingItems, batteryPercentage,
+    scanning, scannerStatus, sessionMode, smartMode,uniqueTagsCount, categoryCount, missingItems, batteryPercentage, pendingCount,uniqueTagsCount, categoryCount, missingItems, batteryPercentage,
     connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode
   } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
     if (!sessionStorage.getItem('authenticated')) {
@@ -326,6 +327,25 @@ const Dashboard = () => {
           <div className="text-sm text-muted-foreground">
             Last synced: {new Date(lastSyncTime).toLocaleString('en-IN')}
           </div>
+        )}
+
+        {/* Offline pending sync banner */}
+        {pendingCount > 0 && (
+          <Card className="border-amber-500 bg-amber-500/10">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📶</span>
+                <div>
+                  <p className="font-semibold text-amber-600 text-sm">
+                    {pendingCount} scans pending sync
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isOnline ? 'Syncing now...' : 'Will sync when internet is available'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {batteryPercentage !== null && batteryPercentage <= 20 && (
