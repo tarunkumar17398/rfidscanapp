@@ -207,7 +207,7 @@ export class RFIDScanner {
     console.log('📥 Raw chunk:', hexStr, '| Length:', incoming.length);
 
     // Check if this starts a new packet (CF FF header)
-    if (incoming.length >= 2 && incoming[0] === 0xCF && incoming[1] === 0xFF) {
+    if (incoming.length >= 2 && incoming[0] === 0xCF) {
       // New packet — reset buffer
       this.packetBuffer = Array.from(incoming);
       if (incoming.length >= 5) {
