@@ -412,6 +412,7 @@ export const api = {
       const { data: inventory, error: invError } = await supabase
         .from('inventory')
         .select('*')
+        .eq('has_rfid_tag', true)
         .range(0, 9999);
 
       if (invError) throw invError;
