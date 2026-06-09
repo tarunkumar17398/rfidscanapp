@@ -42,9 +42,10 @@ const Dashboard = () => {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const {
-    scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, categoryCount, missingItems, batteryPercentage, pendingCount,,uniqueTagsCount, categoryCount, missingItems, batteryPercentage,
+      scanning, scannerStatus, sessionMode, smartMode,
+      uniqueTagsCount, categoryCount, missingItems, batteryPercentage, pendingCount,
       connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode
-  } = useScanner();
+    } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
