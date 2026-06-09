@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,6 @@ import { useScanner } from '@/contexts/ScannerContext';
 import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw } from 'lucide-react';
 import { ScanProgress } from '@/components/ScanProgress';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
 import { ScannerStatus } from '@/components/ScannerStatus';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,14 +16,6 @@ import { useAnimatedCounter } from '@/hooks/useAnimatedCounter';
 import { AnimatedTableCell } from '@/components/AnimatedTableCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SessionMode } from '@/lib/rfidScanner';
-import { fetchInventoryFromAPI, InventoryItem } from '@/services/inventoryApi';
-
-const CATEGORY_CODES: Record<string, string> = {
-  'Brass': 'BR',
-  'Iron': 'IR',
-  'Wood': 'WD',
-  'Tanjore Paintings': 'TP',
-};
 
 interface CategoryStats {
   category: string;
@@ -36,7 +27,7 @@ interface CategoryStats {
 }
 
 interface CycleInfo {
-  id: string; // Changed from number to string (UUID)
+  id: string;
   status: string;
   started_at: string;
   finished_at: string | null;
@@ -49,7 +40,11 @@ const Dashboard = () => {
   const [batteryWarningShown, setBatteryWarningShown] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
-  const { scanning, scannerStatus, sessionMode, smartMode, uniqueTagsCount, categoryCount, missingItems, batteryPercentage, connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode } = useScanner();
+  const {
+    scanning, scannerStatus, sessionMode, smartMode,
+    uniqueTagsCount, categoryCount, missingItems, batteryPercentage,
+    connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode
+  } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -59,25 +54,20 @@ const Dashboard = () => {
       return;
     }
 
-    // Load last sync time
     const savedSyncTime = localStorage.getItem('lastInventorySyncTime');
-    if (savedSyncTime) {
-      setLastSyncTime(savedSyncTime);
-    }
+    if (savedSyncTime) setLastSyncTime(savedSyncTime);
 
-    // Check if sync is needed
     const lastSyncDate = localStorage.getItem('lastInventorySync');
     const today = new Date().toDateString();
-    
+
     console.log('=== DASHBOARD INITIALIZATION ===');
     console.log(`Today: ${today}`);
     console.log(`Last sync: ${lastSyncDate || 'never'}`);
     console.log(`Sync needed: ${lastSyncDate !== today}`);
-    
+
     if (lastSyncDate !== today) {
       console.log('→ Will run auto-sync on first load...');
       setIsSyncing(true);
-      
       autoSyncInventory()
         .then(() => {
           const now = new Date().toISOString();
@@ -88,80 +78,71 @@ const Dashboard = () => {
         })
         .catch((error) => {
           console.error('=== AUTO-SYNC FAILED ===', error);
-          toast({
-            title: 'Sync Failed',
-            description: 'Failed to sync inventory from API',
-            variant: 'destructive'
-          });
+          toast({ title: 'Sync Failed', description: 'Failed to sync inventory from API', variant: 'destructive' });
         })
         .finally(() => {
           setIsSyncing(false);
-          // Fetch stats once after sync completes
-          console.log('→ Fetching stats after sync...');
           fetchStats();
         });
     } else {
       console.log('→ Already synced today, loading existing data');
-      // Fetch stats once on initial load
       fetchStats();
     }
 
-    // Throttle for realtime updates (fires at most once every 2 seconds)
     let lastFetchTime = 0;
     let pendingFetch: ReturnType<typeof setTimeout> | null = null;
-    
-    // Subscribe to real-time scan updates with throttle to prevent server overload
+
     const channel = supabase
       .channel('scan-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'scans'
-        },
-        () => {
-          const now = Date.now();
-          const timeSinceLastFetch = now - lastFetchTime;
-          
-          if (timeSinceLastFetch >= 2000) {
-            // Enough time has passed, fetch immediately
-            lastFetchTime = now;
-            console.log('Scans detected, refreshing stats (throttle: immediate)...');
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scans' }, () => {
+        const now = Date.now();
+        const timeSinceLastFetch = now - lastFetchTime;
+        if (timeSinceLastFetch >= 2000) {
+          lastFetchTime = now;
+          fetchStats();
+        } else if (!pendingFetch) {
+          const delay = 2000 - timeSinceLastFetch;
+          pendingFetch = setTimeout(() => {
+            lastFetchTime = Date.now();
+            pendingFetch = null;
             fetchStats();
-          } else if (!pendingFetch) {
-            // Schedule a fetch for when the throttle window expires
-            const delay = 2000 - timeSinceLastFetch;
-            pendingFetch = setTimeout(() => {
-              lastFetchTime = Date.now();
-              pendingFetch = null;
-              console.log('Scans detected, refreshing stats (throttle: delayed)...');
-              fetchStats();
-            }, delay);
-          }
-          // If pendingFetch already exists, skip - it will handle the update
+          }, delay);
         }
-      )
+      })
       .subscribe();
 
     return () => {
-      if (pendingFetch) {
-        clearTimeout(pendingFetch);
-      }
+      if (pendingFetch) clearTimeout(pendingFetch);
       supabase.removeChannel(channel);
     };
   }, []);
+
+  useEffect(() => {
+    if (batteryPercentage !== null && batteryPercentage <= 20 && !batteryWarningShown) {
+      setBatteryWarningShown(true);
+      toast({
+        title: '🔋 Low Battery Warning',
+        description: `Scanner battery at ${batteryPercentage}%. Please charge soon.`,
+        variant: 'destructive',
+        duration: 6000
+      });
+    }
+    if (batteryPercentage !== null && batteryPercentage > 20) {
+      setBatteryWarningShown(false);
+    }
+  }, [batteryPercentage, batteryWarningShown, toast]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }));
+  };
 
   const autoSyncInventory = async () => {
     try {
       console.log('=== AUTO-SYNC START (server-side) ===');
       const { data, error } = await supabase.functions.invoke('sync-inventory');
-      
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Sync failed');
-
       console.log('=== AUTO-SYNC COMPLETE ===', data);
-      
       toast({
         title: 'Inventory Synced',
         description: `${data.count} items loaded (${data.withRfid} with RFID, ${data.withoutRfid} without)`,
@@ -184,7 +165,7 @@ const Dashboard = () => {
   const handleStartCycle = async () => {
     try {
       await api.startCycle();
-      clearScanAttempts(); // Clear local scan history when starting new cycle
+      clearScanAttempts();
       toast({ title: 'Success', description: 'New cycle started' });
       fetchStats();
     } catch (error) {
@@ -201,7 +182,6 @@ const Dashboard = () => {
       toast({ title: 'Error', description: 'Failed to finish cycle', variant: 'destructive' });
     }
   };
-
 
   const handleExport = async () => {
     try {
@@ -226,9 +206,7 @@ const Dashboard = () => {
   };
 
   const handleForceSync = async () => {
-    console.log('=== FORCE SYNC TRIGGERED BY USER ===');
     setIsSyncing(true);
-    
     try {
       await autoSyncInventory();
       const now = new Date().toISOString();
@@ -236,24 +214,18 @@ const Dashboard = () => {
       localStorage.setItem('lastInventorySync', today);
       localStorage.setItem('lastInventorySyncTime', now);
       setLastSyncTime(now);
-      
-      toast({
-        title: 'Sync Complete',
-        description: 'Inventory has been refreshed from CK API',
-      });
-      
-      // Refresh stats immediately
+      toast({ title: 'Sync Complete', description: 'Inventory has been refreshed from CK API' });
       await fetchStats();
     } catch (error) {
-      console.error('Force sync error:', error);
-      toast({
-        title: 'Sync Failed',
-        description: 'Failed to sync inventory from API',
-        variant: 'destructive'
-      });
+      toast({ title: 'Sync Failed', description: 'Failed to sync inventory from API', variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
   };
 
   const totalScanned = stats.reduce((sum, s) => sum + s.scanned, 0);
@@ -261,81 +233,37 @@ const Dashboard = () => {
   const totalMissing = stats.reduce((sum, s) => sum + s.missing, 0);
   const totalWithRfid = stats.reduce((sum, s) => sum + (s.totalWithRfid || 0), 0);
   const totalWithoutRfid = stats.reduce((sum, s) => sum + (s.totalWithoutRfid || 0), 0);
-  
-  // Animated counters for smooth transitions
+
   const animatedTotalItems = useAnimatedCounter(totalItems);
   const animatedTotalScanned = useAnimatedCounter(totalScanned);
   const animatedTotalMissing = useAnimatedCounter(totalMissing);
   const animatedTotalWithRfid = useAnimatedCounter(totalWithRfid);
   const animatedTotalWithoutRfid = useAnimatedCounter(totalWithoutRfid);
 
-  // Battery warning effect
-  useEffect(() => {
-    if (batteryPercentage !== null && batteryPercentage <= 20 && !batteryWarningShown) {
-      setBatteryWarningShown(true);
-      toast({
-        title: '🔋 Low Battery Warning',
-        description: `Scanner battery at ${batteryPercentage}%. Please charge soon.`,
-        variant: 'destructive',
-        duration: 6000
-      });
-    }
-    if (batteryPercentage !== null && batteryPercentage > 20) {
-      setBatteryWarningShown(false);
-    }
-  }, [batteryPercentage, batteryWarningShown, toast]);
-
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  const formatDate = (dateString: string | null) => {
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString('en-IN', { 
-      dateStyle: 'medium', 
-      timeStyle: 'short' 
-    });
-  };
-
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4 pb-6">
-      {/* Syncing Overlay */}
+
       {isSyncing && (
         <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-50 flex items-center justify-center">
           <Card className="p-8 max-w-md mx-4">
             <div className="text-center space-y-4">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
               <h3 className="text-xl font-semibold">Syncing Inventory</h3>
-              <p className="text-muted-foreground">
-                Fetching all items from CK Inventory API with pagination...
-              </p>
-              <p className="text-sm text-muted-foreground">
-                This may take a moment for large inventories
-              </p>
+              <p className="text-muted-foreground">Fetching all items from CK Inventory API...</p>
             </div>
           </Card>
         </div>
       )}
 
       <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
+
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl sm:text-3xl font-bold">Inventory Dashboard</h1>
             <ConnectionStatus />
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleForceSync} 
-              disabled={isSyncing}
-              size="sm" 
-              className="h-10"
-            >
+            <Button variant="outline" onClick={handleForceSync} disabled={isSyncing} size="sm" className="h-10">
               <RefreshCw className={`h-4 w-4 sm:mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </Button>
@@ -346,29 +274,26 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Last Sync Info */}
         {lastSyncTime && (
           <div className="text-sm text-muted-foreground">
             Last synced: {new Date(lastSyncTime).toLocaleString('en-IN')}
           </div>
         )}
 
-        {/* Battery Warning Card */}
-      {batteryPercentage !== null && batteryPercentage <= 20 && (
-        <Card className="border-destructive bg-destructive/10">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">🔋</span>
-              <div>
-                <p className="font-semibold text-destructive text-sm">Low Battery: {batteryPercentage}%</p>
-                <p className="text-xs text-muted-foreground">Please charge your scanner soon</p>
+        {batteryPercentage !== null && batteryPercentage <= 20 && (
+          <Card className="border-destructive bg-destructive/10">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🔋</span>
+                <div>
+                  <p className="font-semibold text-destructive text-sm">Low Battery: {batteryPercentage}%</p>
+                  <p className="text-xs text-muted-foreground">Please charge your scanner soon</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Cycle Info Card */}
         {cycleInfo && (
           <Card className="bg-muted/50 border-2">
             <CardContent className="p-4 sm:p-6">
@@ -377,20 +302,16 @@ const Dashboard = () => {
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-sm sm:text-base">Current Cycle: #{cycleInfo.id}</h3>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      cycleInfo.status === 'active' 
-                        ? 'bg-secondary text-secondary-foreground' 
+                      cycleInfo.status === 'active'
+                        ? 'bg-secondary text-secondary-foreground'
                         : 'bg-muted text-muted-foreground'
                     }`}>
                       {cycleInfo.status === 'active' ? '● Active' : '● Finished'}
                     </span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Started: {formatDate(cycleInfo.started_at)}
-                  </p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Started: {formatDate(cycleInfo.started_at)}</p>
                   {cycleInfo.finished_at && (
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      Finished: {formatDate(cycleInfo.finished_at)}
-                    </p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Finished: {formatDate(cycleInfo.finished_at)}</p>
                   )}
                 </div>
                 {cycleInfo.status === 'finished' && (
@@ -416,18 +337,18 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           <Card className="border-secondary">
-  <CardHeader className="p-3 sm:p-6">
-    <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
-  </CardHeader>
-  <CardContent className="p-3 sm:p-6 pt-0">
-    <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">
-      {scanning ? uniqueTagsCount : animatedTotalScanned}
-    </p>
-    <p className="text-xs text-muted-foreground mt-1">
-      {scanning ? 'Live count' : 'RFID tags found'}
-    </p>
-  </CardContent>
-</Card>
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="text-xs sm:text-lg">Scanned</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <p className="text-2xl sm:text-4xl font-bold text-secondary tabular-nums">
+                {scanning ? uniqueTagsCount : animatedTotalScanned}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {scanning ? 'Live count' : 'RFID tags found'}
+              </p>
+            </CardContent>
+          </Card>
           <Card className="border-destructive">
             <CardHeader className="p-3 sm:p-6">
               <CardTitle className="text-xs sm:text-lg">Missing</CardTitle>
@@ -439,7 +360,6 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Latest Cycle Category Stats */}
         <Card>
           <CardHeader className="p-4 sm:p-6">
             <CardTitle className="text-lg sm:text-xl">Latest Cycle Results</CardTitle>
@@ -475,47 +395,46 @@ const Dashboard = () => {
                   </TableHeader>
                   <TableBody>
                     {stats.map((stat) => {
-  const liveScanned = scanning && categoryCount[stat.category] !== undefined
-    ? categoryCount[stat.category]
-    : stat.scanned;
-  const liveMissing = scanning && categoryCount[stat.category] !== undefined
-    ? Math.max(0, stat.totalWithRfid - (categoryCount[stat.category] || 0))
-    : stat.missing;
-  const progressPct = stat.totalWithRfid > 0
-    ? Math.min(100, Math.round((liveScanned / stat.totalWithRfid) * 100))
-    : 0;
-
-  return (
-    <TableRow key={stat.category}>
-      <TableCell className="font-medium">
-        <div>{stat.category}</div>
-        <div className="w-full bg-muted rounded-full h-1.5 mt-1">
-          <div
-            className="bg-secondary h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-        <div className="text-xs text-muted-foreground mt-0.5">{progressPct}%</div>
-      </TableCell>
-      <AnimatedTableCell value={stat.total} className="font-semibold" />
-      <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
-      <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
-      <TableCell className="text-right font-semibold text-secondary tabular-nums">
-        {liveScanned}
-      </TableCell>
-      <TableCell className="text-right font-semibold text-destructive tabular-nums">
-        {liveMissing}
-      </TableCell>
-    </TableRow>
-  );
-))}
+                      const liveScanned = scanning && categoryCount[stat.category] !== undefined
+                        ? categoryCount[stat.category]
+                        : stat.scanned;
+                      const liveMissing = scanning && categoryCount[stat.category] !== undefined
+                        ? Math.max(0, stat.totalWithRfid - (categoryCount[stat.category] || 0))
+                        : stat.missing;
+                      const progressPct = stat.totalWithRfid > 0
+                        ? Math.min(100, Math.round((liveScanned / stat.totalWithRfid) * 100))
+                        : 0;
+                      return (
+                        <TableRow key={stat.category}>
+                          <TableCell className="font-medium">
+                            <div>{stat.category}</div>
+                            <div className="w-full bg-muted rounded-full h-1.5 mt-1">
+                              <div
+                                className="bg-secondary h-1.5 rounded-full transition-all duration-300"
+                                style={{ width: `${progressPct}%` }}
+                              />
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">{progressPct}%</div>
+                          </TableCell>
+                          <AnimatedTableCell value={stat.total} className="font-semibold" />
+                          <AnimatedTableCell value={stat.totalWithRfid} className="text-primary" />
+                          <AnimatedTableCell value={stat.totalWithoutRfid} className="text-muted-foreground" />
+                          <TableCell className="text-right font-semibold text-secondary tabular-nums">
+                            {liveScanned}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-destructive tabular-nums">
+                            {liveMissing}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
+            )}
+          </CardContent>
         </Card>
 
-        {/* Live Missing Items — only during active scan */}
         {scanning && (
           <Card>
             <CardHeader className="p-4 sm:p-6 pb-2">
@@ -546,9 +465,7 @@ const Dashboard = () => {
                           </span>
                         )}
                       </div>
-                      <span className="text-muted-foreground text-sm">
-                        {isExpanded ? '▼' : '▶'}
-                      </span>
+                      <span className="text-muted-foreground text-sm">{isExpanded ? '▼' : '▶'}</span>
                     </button>
                     {isExpanded && (
                       <div className="divide-y">
@@ -573,7 +490,6 @@ const Dashboard = () => {
           </Card>
         )}
 
-        {/* Scan Progress (Zebra-inspired) */}
         <ScanProgress />
 
         <Card>
@@ -585,23 +501,13 @@ const Dashboard = () => {
               <span className="font-medium text-sm sm:text-base">Status:</span>
               <ScannerStatus />
             </div>
-            
-            {/* Smart Mode Toggle */}
             <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
               <div className="flex flex-col">
                 <span className="font-medium text-sm sm:text-base">Smart Mode</span>
-                <span className="text-xs text-muted-foreground mt-0.5">
-                  Auto-switches S1→S0 when discovery slows
-                </span>
+                <span className="text-xs text-muted-foreground mt-0.5">Auto-switches S1→S0 when discovery slows</span>
               </div>
-              <Switch
-                checked={smartMode}
-                onCheckedChange={setSmartMode}
-                disabled={scannerStatus === 'Not connected'}
-              />
+              <Switch checked={smartMode} onCheckedChange={setSmartMode} disabled={scannerStatus === 'Not connected'} />
             </div>
-
-            {/* Session Mode Selector */}
             <div className="flex items-center justify-between p-3 sm:p-4 bg-muted rounded-lg">
               <div className="flex flex-col">
                 <span className="font-medium text-sm sm:text-base">Session Mode:</span>
@@ -612,8 +518,8 @@ const Dashboard = () => {
                   {sessionMode === 'S3' && 'Minimal duplicates'}
                 </span>
               </div>
-              <Select 
-                value={sessionMode} 
+              <Select
+                value={sessionMode}
                 onValueChange={(value) => setSessionMode(value as SessionMode)}
                 disabled={scannerStatus === 'Not connected' || smartMode}
               >
@@ -628,21 +534,20 @@ const Dashboard = () => {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Button onClick={connectScanner} variant="outline" className="h-12 sm:h-10 text-xs sm:text-sm">
                 Connect Scanner
               </Button>
               <Button onClick={toggleScan} disabled={scannerStatus === 'Not connected'} className="h-12 sm:h-10 text-xs sm:text-sm">
-                {scanning ? <><Square className="h-4 w-4 mr-2" /><span>Stop Scan</span></> : <><Play className="h-4 w-4 mr-2" /><span>Start Scan</span></>}
+                {scanning
+                  ? <><Square className="h-4 w-4 mr-2" /><span>Stop Scan</span></>
+                  : <><Play className="h-4 w-4 mr-2" /><span>Start Scan</span></>}
               </Button>
               <Button onClick={handleStartCycle} variant="secondary" className="h-12 sm:h-10 text-xs sm:text-sm">
-                <Play className="h-4 w-4 sm:mr-2" />
-                New Cycle
+                <Play className="h-4 w-4 sm:mr-2" />New Cycle
               </Button>
               <Button onClick={handleFinishCycle} variant="destructive" className="h-12 sm:h-10 text-xs sm:text-sm">
-                <Square className="h-4 w-4 sm:mr-2" />
-                Finish Cycle
+                <Square className="h-4 w-4 sm:mr-2" />Finish Cycle
               </Button>
             </div>
           </CardContent>
@@ -657,8 +562,7 @@ const Dashboard = () => {
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span>Total:</span>
-                    <span className="font-bold">{stat.total}</span>
+                    <span>Total:</span><span className="font-bold">{stat.total}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">With RFID:</span>
@@ -669,15 +573,13 @@ const Dashboard = () => {
                     <span className="font-semibold text-muted-foreground">{stat.totalWithoutRfid}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Scanned:</span>
-                    <span className="font-bold text-secondary">{stat.scanned}</span>
+                    <span>Scanned:</span><span className="font-bold text-secondary">{stat.scanned}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Missing:</span>
-                    <span className="font-bold text-destructive">{stat.missing}</span>
+                    <span>Missing:</span><span className="font-bold text-destructive">{stat.missing}</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2 mt-2">
-                    <div 
+                    <div
                       className="bg-secondary h-2 rounded-full transition-all"
                       style={{ width: `${stat.totalWithRfid > 0 ? (stat.scanned / stat.totalWithRfid * 100) : 0}%` }}
                     />
@@ -690,27 +592,23 @@ const Dashboard = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Button onClick={() => navigate('/import')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
-            <Upload className="h-5 w-5 sm:mr-2" />
-            <span className="ml-2 sm:ml-0">Import Inventory</span>
+            <Upload className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">Import Inventory</span>
           </Button>
           <Button onClick={() => navigate('/live-scans')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
-            <List className="h-5 w-5 sm:mr-2" />
-            <span className="ml-2 sm:ml-0">Live Scans</span>
+            <List className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">Live Scans</span>
           </Button>
           <Button onClick={() => navigate('/missing')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
-            <AlertTriangle className="h-5 w-5 sm:mr-2" />
-            <span className="ml-2 sm:ml-0">Missing Items</span>
+            <AlertTriangle className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">Missing Items</span>
           </Button>
           <Button onClick={() => navigate('/reports')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
-            <FileText className="h-5 w-5 sm:mr-2" />
-            <span className="ml-2 sm:ml-0">PDF Reports</span>
+            <FileText className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">PDF Reports</span>
           </Button>
         </div>
 
         <Button onClick={handleExport} className="w-full h-14 sm:h-16 text-sm sm:text-base" variant="secondary">
-          <FileDown className="h-5 w-5 mr-2" />
-          Export CSV Report
+          <FileDown className="h-5 w-5 mr-2" />Export CSV Report
         </Button>
+
       </div>
     </div>
   );
