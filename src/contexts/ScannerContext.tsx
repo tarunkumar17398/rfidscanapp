@@ -146,8 +146,8 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         tagMapRef.current = map;
         console.log(`🗺️ Tag map ready: ${Object.keys(map).length} tags`);
 
-        // Build initial missing items list (all items missing at start)
-        buildMissingItems(map, new Set());
+        // Don't build missing items on load — only during active scan
+        // buildMissingItems(map, new Set());
       } catch (e) {
         console.error('Failed to fetch initial data:', e);
       }
@@ -230,7 +230,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     api.getTagMap().then(map => {
       tagMapRef.current = map;
       console.log(`🗺️ Tag map reloaded: ${Object.keys(map).length} tags`);
-      buildMissingItems(map, new Set());
+      setMissingItems({});
     });
 
       // Scan rate calculation
@@ -357,7 +357,9 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         }));
 
         // ── Update missing items list immediately ──
-        buildMissingItems(tagMapRef.current, sessionScansRef.current);
+        // Build missing items using a snapshot of current scanned set
+        const scannedSnapshot = new Set(sessionScansRef.current);
+        buildMissingItems(tagMapRef.current, scannedSnapshot);
 
         // ── Auto-stop when all items found ──
         const totalTagged = Object.keys(tagMapRef.current).length;
