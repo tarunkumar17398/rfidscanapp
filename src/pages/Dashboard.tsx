@@ -44,11 +44,14 @@ const Dashboard = () => {
   const {
       scanning, scannerStatus, sessionMode, smartMode,
       uniqueTagsCount, categoryCount, missingItems, batteryPercentage, pendingCount,
+      lastScannedTag,lastScannedTagInfo,
       connectScanner, toggleScan, clearScanAttempts, setSessionMode, setSmartMode
     } = useScanner();
   const navigate = useNavigate();
   const { toast } = useToast();
   const isOnline = useOnlineStatus();
+
+  
 
   useEffect(() => {
     if (!sessionStorage.getItem('authenticated')) {
@@ -428,6 +431,24 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Last Scanned Item */}
+        {scanning && lastScannedTagInfo && (
+          <Card className="border-primary/50 bg-primary/5">
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🏷️</span>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last Scanned</p>
+                  <p className="font-semibold text-sm text-foreground">
+                    {lastScannedTagInfo.particulars}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{lastScannedTagInfo.category}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="p-4 sm:p-6">

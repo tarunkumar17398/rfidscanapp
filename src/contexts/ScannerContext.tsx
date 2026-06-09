@@ -66,6 +66,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
   const [scanAttempts, setScanAttempts] = useState<ScanAttempt[]>([]);
   const [totalScans, setTotalScans] = useState(0);
   const [uniqueTagsCount, setUniqueTagsCount] = useState(0); // ← NEW: instant local unique count
+  const [lastScannedTagInfo, setLastScannedTagInfo] = useState<{ particulars: string; category: string } | null>(null);
   const [categoryCount, setCategoryCount] = useState<Record<string, number>>({});
   const [missingItems, setMissingItems] = useState<Record<string, { tagId: string; particulars: string; itemCode: string }[]>>({});
   const tagMapRef = useRef<Record<string, { category: string; particulars: string; itemCode: string }>>({});
@@ -338,6 +339,11 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         // Look up category from local tag map
         const itemInfo = tagMapRef.current[tagId];
         const category = itemInfo?.category || 'Unknown';
+        // Update last scanned item info immediately
+        setLastScannedTagInfo({
+          particulars: itemInfo?.particulars || 'Unknown Item',
+          category: itemInfo?.category || 'Unknown'
+        });
         console.log(`✓ New unique tag: ${tagId} | Category: ${category} (RSSI: ${rssi})`);
 
         // ── Update UI counters immediately ──
@@ -498,6 +504,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         categoryCount,
         missingItems,
         pendingCount,
+        lastScannedTagInfo,
         scanRate,
         pulseTrigger,
         sessionMode,
@@ -512,6 +519,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         setSessionMode,
         setSmartMode,
         setMinRssiThreshold,
+        lastScannedTagInfo: { particulars: string; category: string } | null;
         }}
     >
       {children}
