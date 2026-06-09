@@ -497,7 +497,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         uniqueTagsCount,
         categoryCount,
         missingItems,
-        pendingCount;
+        pendingCount,
         scanRate,
         pulseTrigger,
         sessionMode,
@@ -512,8 +512,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         setSessionMode,
         setSmartMode,
         setMinRssiThreshold,
-        pendingCount: number;
-      }}
+        }}
     >
       {children}
     </ScannerContext.Provider>
