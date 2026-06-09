@@ -519,8 +519,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         setSessionMode,
         setSmartMode,
         setMinRssiThreshold,
-        lastScannedTagInfo: { particulars: string; category: string } | null;
-        }}
+      }}
     >
       {children}
     </ScannerContext.Provider>
