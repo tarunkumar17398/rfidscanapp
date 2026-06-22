@@ -24,10 +24,6 @@ export interface SmartScanStats {
   rssiMin: number;
   rssiMax: number;
   rssiAvg: number;
-  uniqueTagsCount: number;
-  categoryCount: Record<string, number>;
-  missingItems: Record<string, { tagId: string; particulars: string; itemCode: string }[]>;
-  
 }
 
 interface ScannerContextType {
@@ -36,9 +32,13 @@ interface ScannerContextType {
   scannerStatus: string;
   batteryPercentage: number | null;
   lastScannedTag: string | null;
+  lastScannedTagInfo: { particulars: string; category: string } | null;
   scanAttempts: ScanAttempt[];
   totalScans: number;
   uniqueTagsCount: number;
+  categoryCount: Record<string, number>;
+  missingItems: Record<string, { tagId: string; particulars: string; itemCode: string }[]>;
+  pendingCount: number;
   scanRate: number;
   pulseTrigger: number;
   sessionMode: SessionMode;
@@ -54,7 +54,6 @@ interface ScannerContextType {
   setSmartMode: (enabled: boolean) => void;
   setMinRssiThreshold: (rssi: number) => void;
 }
-
 const ScannerContext = createContext<ScannerContextType | undefined>(undefined);
 
 export const ScannerProvider = ({ children }: { children: ReactNode }) => {
@@ -420,7 +419,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     return connected;
   };
 
-   const startScan = async () => {
+ const startScan = async () => {
     scanStartTimeRef.current = Date.now();
     discoveryTimestampsRef.current = [];
     noNewTagsStartRef.current = null;
