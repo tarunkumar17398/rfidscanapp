@@ -420,11 +420,13 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     return connected;
   };
 
-  const startScan = async () => {
+   const startScan = async () => {
     scanStartTimeRef.current = Date.now();
     discoveryTimestampsRef.current = [];
     noNewTagsStartRef.current = null;
     rssiValuesRef.current = [];
+    // Build full missing items list at scan start — everything is missing initially
+    buildMissingItems(tagMapRef.current, new Set());
     await scanner.startScan();
     setScanning(true);
   };
