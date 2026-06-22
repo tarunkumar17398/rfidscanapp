@@ -33,7 +33,8 @@ function finalizeCommand(baseCmd: Uint8Array): Uint8Array {
   return finalCmd;
 }
 
-const START_SCAN_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x01, 0x05, 0x01, 0x00, 0x00, 0x00, 0x01]);
+// InvType=0x00 (time-based continuous), InvParam=0 (run until stop command)
+const START_SCAN_BASE = new Uint8Array([0xCF, 0x00, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00]);
 const START_SCAN_COMMAND = finalizeCommand(START_SCAN_BASE);
 
 const STOP_SCAN_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x02, 0x00]);
@@ -44,6 +45,32 @@ const SET_SCAN_MODE_COMMAND = finalizeCommand(SET_SCAN_MODE_BASE);
 
 const GET_BATTERY_BASE = new Uint8Array([0xCF, 0xFF, 0x00, 0x83, 0x00]);
 const GET_BATTERY_COMMAND = finalizeCommand(GET_BATTERY_BASE);
+
+// Get all device parameters
+const GET_ALL_PARAM_BASE = new Uint8Array([0xCF, 0x00, 0x00, 0x8A, 0x00]);
+const GET_ALL_PARAM_COMMAND = finalizeCommand(GET_ALL_PARAM_BASE);
+
+// Set Q Value command (byte 5 = Q value)
+const createSetQValueCommand = (qValue: number): Uint8Array => {
+  const base = new Uint8Array([0xCF, 0x00, 0x00, 0x8B, 0x01, qValue]);
+  return finalizeCommand(base);
+};
+
+// Set Session command (byte 5 = session 0-3)
+const createSetSessionCommand = (session: number): Uint8Array => {
+  const base = new Uint8Array([0xCF, 0x00, 0x00, 0x8C, 0x01, session]);
+  return finalizeCommand(base);
+};
+
+// Set Power command (byte 5 = power 0-30 dBm)
+const createSetPowerCommand = (power: number): Uint8Array => {
+  const base = new Uint8Array([0xCF, 0x00, 0x00, 0x84, 0x01, power]);
+  return finalizeCommand(base);
+};
+
+// Reboot command
+const REBOOT_BASE = new Uint8Array([0xCF, 0x00, 0x00, 0x90, 0x00]);
+const REBOOT_COMMAND = finalizeCommand(REBOOT_BASE);
 
 const createSessionCommand = (session: number): Uint8Array => {
   const base = new Uint8Array([0xCF, 0xFF, 0x00, 0x8C, 0x09, session, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
@@ -63,6 +90,7 @@ export class RFIDScanner {
   private onTagScanned: ((data: TagReadData) => void) | null = null;
   private onStatusChange: ((status: string) => void) | null = null;
   private onBatteryUpdate: ((percentage: number) => void) | null = null;
+  private onDeviceParams: ((params: { power: number; qValue: number; session: number }) => void) | null = null;
   private batteryCheckInterval: number | null = null;
 
   // ── Packet reassembly buffer ──────────────────────────────────────────────
@@ -80,6 +108,10 @@ export class RFIDScanner {
 
   setOnBatteryUpdate(callback: (percentage: number) => void) {
     this.onBatteryUpdate = callback;
+  }
+
+  setOnDeviceParams(callback: (params: { power: number; qValue: number; session: number }) => void) {
+    this.onDeviceParams = callback;
   }
 
   async connect(): Promise<boolean> {
@@ -247,6 +279,21 @@ export class RFIDScanner {
     const bytes = Array.from(new Uint8Array(value.buffer)).map(b => b.toString(16).padStart(2, '0')).join(' ');
     console.log('✅ Parsing full packet:', bytes);
 
+    // GetAllParam response (command byte 0x8A)
+    if (value.byteLength >= 10 && value.getUint8(3) === 0x8A) {
+      console.log('📋 GetAllParam response received');
+      if (value.byteLength >= 6) {
+        const power = value.getUint8(5);
+        const qValue = value.byteLength >= 11 ? value.getUint8(10) : -1;
+        const session = value.byteLength >= 12 ? value.getUint8(11) : -1;
+        console.log(`⚙️ Power: ${power}dBm | QValue: ${qValue} | Session: S${session}`);
+        if (this.onDeviceParams) {
+          this.onDeviceParams({ power, qValue, session });
+        }
+      }
+      return;
+    }
+
     // Battery response (command byte 0x83)
     if (value.byteLength >= 7 && value.getUint8(3) === 0x83) {
       const batteryPercentage = value.getUint8(6);
@@ -268,8 +315,9 @@ export class RFIDScanner {
     let rssi = -60;
     if (value.byteLength > 6) {
       const rawRssi = value.getUint8(6);
-      // Two's complement signed byte as per Chafon SDK spec
-      rssi = rawRssi > 127 ? rawRssi - 256 : rawRssi;
+      // RSSI is in 0.1 dBm units, two's complement
+      let rssiRaw = rawRssi > 127 ? rawRssi - 256 : rawRssi;
+      rssi = rssiRaw / 10;
       console.log('📶 RSSI:', rssi, 'dBm (raw byte:', rawRssi, ')');
     }
 
@@ -305,6 +353,53 @@ export class RFIDScanner {
 
   private updateStatus(status: string) {
     if (this.onStatusChange) this.onStatusChange(status);
+  }
+
+  async getAllParams(): Promise<void> {
+    if (!this.writeCharacteristic) return;
+    try {
+      await this.writeCharacteristic.writeValue(GET_ALL_PARAM_COMMAND as any);
+      console.log('📋 GetAllParam sent');
+    } catch (error: any) {
+      console.error('GetAllParam failed:', error);
+    }
+  }
+
+  async setQValue(qValue: number): Promise<void> {
+    if (!this.writeCharacteristic) return;
+    try {
+      const command = createSetQValueCommand(qValue);
+      await this.writeCharacteristic.writeValue(command as any);
+      console.log(`✅ Q Value set to ${qValue}`);
+    } catch (error: any) {
+      console.error('SetQValue failed:', error);
+    }
+  }
+
+  async setPower(power: number): Promise<void> {
+    if (!this.writeCharacteristic) return;
+    try {
+      const command = createSetPowerCommand(power);
+      await this.writeCharacteristic.writeValue(command as any);
+      console.log(`✅ Power set to ${power} dBm`);
+    } catch (error: any) {
+      console.error('SetPower failed:', error);
+    }
+  }
+
+  async reboot(): Promise<void> {
+    if (!this.writeCharacteristic) return;
+    try {
+      await this.writeCharacteristic.writeValue(REBOOT_COMMAND as any);
+      console.log('🔄 Reboot command sent');
+    } catch (error: any) {
+      console.error('Reboot failed:', error);
+    }
+  }
+
+  // Auto-calculate optimal Q value based on tag count
+  static calculateOptimalQValue(tagCount: number): number {
+    return Math.ceil(Math.log2(Math.max(tagCount, 1)));
   }
 
   disconnect() {

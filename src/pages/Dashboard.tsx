@@ -17,6 +17,7 @@ import { AnimatedTableCell } from '@/components/AnimatedTableCell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SessionMode } from '@/lib/rfidScanner';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw, Settings } from 'lucide-react';
 
 interface CategoryStats {
   category: string;
@@ -692,6 +693,9 @@ const Dashboard = () => {
           </Button>
           <Button onClick={() => navigate('/reports')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
             <FileText className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">PDF Reports</span>
+          </Button>
+          <Button onClick={() => navigate('/settings')} variant="outline" className="h-16 sm:h-20 text-sm sm:text-base">
+            <Settings className="h-5 w-5 sm:mr-2" /><span className="ml-2 sm:ml-0">Scanner Settings</span>
           </Button>
         </div>
 

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ScannerProvider } from "./contexts/ScannerContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import ScannerSettings from './pages/ScannerSettings';
 import ImportInventory from "./pages/ImportInventory";
 import LiveScans from "./pages/LiveScans";
 import MissingItems from "./pages/MissingItems";
@@ -24,6 +25,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/settings" element={<ScannerSettings />} />
             <Route path="/import" element={<ImportInventory />} />
             <Route path="/live-scans" element={<LiveScans />} />
             <Route path="/missing" element={<MissingItems />} />
