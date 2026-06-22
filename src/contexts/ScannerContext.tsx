@@ -361,6 +361,9 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
           [category]: (prev[category] || 0) + 1
         }));
 
+        // ── Rebuild missing items list ──
+  buildMissingItems(tagMapRef.current, sessionScansRef.current);
+
         // ── Auto-stop when all items found ──
         const totalTagged = Object.keys(tagMapRef.current).length;
         if (totalTagged > 0 && sessionScansRef.current.size >= totalTagged) {
