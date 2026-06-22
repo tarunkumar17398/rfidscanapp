@@ -229,7 +229,7 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     api.getTagMap().then(map => {
       tagMapRef.current = map;
       console.log(`🗺️ Tag map reloaded: ${Object.keys(map).length} tags`);
-      setMissingItems({});
+      buildMissingItems(map, sessionScansRef.current);
     });
 
       // Scan rate calculation
