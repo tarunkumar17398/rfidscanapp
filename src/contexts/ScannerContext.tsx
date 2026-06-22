@@ -356,10 +356,14 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
           [category]: (prev[category] || 0) + 1
         }));
 
-        // ── Update missing items list immediately ──
-        // Build missing items using a snapshot of current scanned set
-        const scannedSnapshot = new Set(sessionScansRef.current);
-        buildMissingItems(tagMapRef.current, scannedSnapshot);
+        // ── Remove found tag from missing items immediately ──
+        setMissingItems(prev => {
+          const updated = { ...prev };
+          for (const category of Object.keys(updated)) {
+            updated[category] = updated[category].filter(item => item.tagId !== tagId);
+          }
+          return updated;
+        });
 
         // ── Auto-stop when all items found ──
         const totalTagged = Object.keys(tagMapRef.current).length;

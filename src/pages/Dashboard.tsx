@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { api } from '@/lib/api';
 import { useScanner } from '@/contexts/ScannerContext';
-import { Play, Square, FileDown, Upload, List, AlertTriangle, LogOut, FileText, RefreshCw } from 'lucide-react';
 import { ScanProgress } from '@/components/ScanProgress';
 import { Switch } from '@/components/ui/switch';
 import { ConnectionStatus } from '@/components/ConnectionStatus';
@@ -427,7 +426,11 @@ const Dashboard = () => {
               <CardTitle className="text-xs sm:text-lg">Missing</CardTitle>
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <p className="text-2xl sm:text-4xl font-bold text-destructive tabular-nums">{animatedTotalMissing}</p>
+              <p className="text-2xl sm:text-4xl font-bold text-destructive tabular-nums">
+                {scanning
+                  ? Math.max(0, totalWithRfid - uniqueTagsCount)
+                  : animatedTotalMissing}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">With RFID, not scanned</p>
             </CardContent>
           </Card>
