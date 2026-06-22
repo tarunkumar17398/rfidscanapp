@@ -277,6 +277,33 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(batchInterval);
   }, [isOnline]);
 
+  // Periodic battery polling (every 30 seconds)
+useEffect(() => {
+  if (!scanning && scannerStatus !== 'Connected') return;
+
+  const pollBattery = async () => {
+    try {
+      // If your scanner SDK supports a method like getBattery()
+      // const level = await scanner.getBattery();
+      // if (level !== null) setBatteryPercentage(level);
+      
+      // Fallback: if the scanner emits battery data on request,
+      // you can trigger a status request
+      // e.g., await scanner.requestStatus();
+      
+      console.log('🔋 Polling battery...');
+    } catch (e) {
+      console.error('Battery poll failed:', e);
+    }
+  };
+
+  // Poll immediately on mount, then every 30s
+  pollBattery();
+  const interval = setInterval(pollBattery, 30000);
+
+  return () => clearInterval(interval);
+}, [scanning, scannerStatus]);
+
   // Auto-sync when coming back online
   useEffect(() => {
     if (isOnline) {
