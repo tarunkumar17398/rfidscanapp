@@ -338,6 +338,12 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
         // Look up category from local tag map
         const itemInfo = tagMapRef.current[tagId];
         const category = itemInfo?.category || 'Unknown';
+
+        // Skip tags not in inventory — don't count them or update missing
+        if (!itemInfo) {
+          console.log(`⚠️ Unknown tag: ${tagId} — not in inventory, skipping`);
+          return;
+        }
         // Update last scanned item info immediately
         setLastScannedTagInfo({
           particulars: itemInfo?.particulars || 'Unknown Item',
@@ -354,15 +360,6 @@ export const ScannerProvider = ({ children }: { children: ReactNode }) => {
           ...prev,
           [category]: (prev[category] || 0) + 1
         }));
-
-        // ── Remove found tag from missing items immediately ──
-        setMissingItems(prev => {
-          const updated = { ...prev };
-          for (const category of Object.keys(updated)) {
-            updated[category] = updated[category].filter(item => item.tagId !== tagId);
-          }
-          return updated;
-        });
 
         // ── Auto-stop when all items found ──
         const totalTagged = Object.keys(tagMapRef.current).length;
